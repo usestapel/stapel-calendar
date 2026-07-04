@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stapel-calendar"
+version = "0.1.0"
+description = "Calendar and scheduling for the Stapel framework"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+keywords = ["django", "stapel", "calendar"]
+classifiers = [
+    "Framework :: Django",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "stapel-core>=0.3.0,<0.4",
+    "python-dateutil>=2.8,<3",
+]
+
+[project.optional-dependencies]
+all = []
+
+[tool.setuptools]
+package-dir = {"stapel_calendar" = "."}
+packages = ["stapel_calendar", "stapel_calendar.migrations", "stapel_calendar.tests"]
+
+[tool.setuptools.package-data]
+stapel_calendar = ["py.typed", "migrations/*.py", "schemas/**/*.json"]
+
+[tool.pytest.ini_options]
+django_find_project = false
+addopts = "--tb=short -q --import-mode=importlib"
+
+[tool.coverage.run]
+omit = [
+    "*/tests/*",
+    "*/conftest.py",
+    "*/migrations/*",
+]

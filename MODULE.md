@@ -1,0 +1,133 @@
+# stapel-calendar — MODULE.md
+
+> Agent-facing map of this module: what it provides, where to extend it
+> without forking, and what not to do. Kept in the same PR as any change
+> to a seam. See also README.md and CHANGELOG.md.
+
+## What this module provides
+
+- **Event / Participant / RSVP** — the generic calendar core. `Event`
+  carries `title/description/start/end` (tz-aware), an `owner`, an opaque
+  `scope_key` (workspace/org/tenant — the library is scope-agnostic, there
+  is **no FK to Organization or Room**), and a `status`. `Participant`
+  holds an RSVP (`invited/accepted/tentative/declined`); reminders are
+  event-driven, **not** a `notified` boolean.
+- **Recurrence engine (RRULE)** — recurrence is a canonical RFC 5545 RRULE
+  string on the series master. Presets (`none/daily/weekdays/weekly/
+  biweekly/monthly/custom`) build the RRULE via `python-dateutil`. Supports
+  **virtual expansion** (compute a range for display, nothing persisted)
+  and **on-demand materialization** (persist an occurrence only when it
+  gains its own state — an RSVP or a host resource), with a series↔occurrence
+  link.
+- **Availability** — recurring working windows + free/busy query + slot
+  computation (the booking primitive).
+- **ICS export** — RFC 5545 VCALENDAR/VEVENT, with a minimal parser for a
+  round-trip.
+- **API** — events CRUD, `respond` (RSVP), user-calendar (events + expanded
+  occurrences in a range), availability, ICS. DTO/DAO + serializer seams +
+  OpenAPI (drf-spectacular).
+- **comm surface** — emits `calendar.occurrence.materialized` (resource
+  hook) and `calendar.event.reminder_due` (reminder delivery); provides the
+  `calendar.free_busy` Function.
+
+**Meetings vs bookings.** These are two flavors of one domain. legacy
+supplies the *meetings* flavor (an occurrence's resource is a video Room);
+the roadmap's *bookings* flavor uses the same core (availability windows +
+slots + RSVP). Everything flavor-specific is pushed to the seams below.
+
+## Extension points (fork-free)
+
+### 1. Resource hook — `calendar.occurrence.materialized` (comm emit)
+
+When a recurring occurrence is materialized, the engine emits
+`calendar.occurrence.materialized` (and sends the `occurrence_materialized`
+Django signal for in-process hosts). **The engine creates no app resource
+itself** — legacy's app-layer subscribes and creates a `Room`, pinning it
+to the occurrence via the emitted `event_id`. This is the exact coupling the
+extraction removed (the source created `rooms.models.Room` inside the
+recurrence loop). Schema: `schemas/emits/calendar.occurrence.materialized.json`.
+
+### 2. Reminder policy — `REMINDER_POLICY` (dotted path, replace)
+
+A `ReminderPolicy` decides *when* and *what* to remind. The default
+(`DefaultReminderPolicy`) fires one `calendar.event.reminder_due` per
+configured offset once the fire time enters the cron scan window; a host
+calls `reminders.run_reminders(now)` on a schedule. Every emit carries a
+stable `dedup_key` (`"<event_id>:<offset>"`) — dedup and delivery are the
+notifications module's job. Subclass to change cadence/channel.
+
+### 3. scope_key provider — `SCOPE_PROVIDER` (dotted path, replace)
+
+A `ScopeProvider` (`resolve(request) -> scope_key`, `filter(qs, request)`)
+resolves the opaque scope from the request and filters querysets. Default is
+a no-op single global scope; legacy returns the active `workspace_id`.
+
+### 4. Recurrence presets — `STAPEL_CALENDAR["PRESETS"]` + `register_preset()` (open registry, MERGE)
+
+Custom recurrence rules beyond the built-ins. Presets are **merged over**
+`recurrence.BUILTIN_PRESETS`; a value is a dict of `dateutil.rrule` kwargs;
+setting a name to `None` removes a built-in.
+
+### Settings — `STAPEL_CALENDAR` namespace (`conf.py`)
+
+Resolution order per key: `settings.STAPEL_CALENDAR[key]` -> flat Django
+setting -> environment variable -> default. Read lazily at call time.
+
+| Key | Default | What it customizes | Semantics |
+|---|---|---|---|
+| `SCOPE_PROVIDER` | `stapel_calendar.scope.DefaultScopeProvider` | Scope resolution/filtering | replace (dotted path) |
+| `REMINDER_POLICY` | `stapel_calendar.reminders.DefaultReminderPolicy` | Reminder cadence/emit | replace (dotted path) |
+| `PRESETS` | `{}` | Recurrence presets | **merge** over built-ins (`None` removes) |
+| `REMINDER_OFFSETS` | `[10]` | Minutes-before-start the default policy fires; also bounds the cron scan lookahead | value |
+| `REMINDER_SCAN_WINDOW_SECONDS` | `60` | Cron scan granularity | value |
+| `DEFAULT_EXPANSION_HORIZON_DAYS` | `90` | Default range end when none given | value |
+| `MAX_EXPANSION_OCCURRENCES` | `1000` | Safety cap on one expansion | value |
+| `DEFAULT_SLOT_MINUTES` | `30` | Default slot length | value |
+
+### Serializer seams (`views.py`)
+
+`SerializerSeamMixin` — subclass a view, set `request_serializer_class` /
+`response_serializer_class`, remount the URL.
+
+| View | Request serializer | Response serializer |
+|---|---|---|
+| `EventListCreateView` | `EventCreateRequestSerializer` | `EventResponseSerializer` |
+| `EventDetailView` | — | `EventResponseSerializer` |
+| `EventRespondView` | `RSVPRequestSerializer` | `EventResponseSerializer` |
+| `CalendarView` | — | `CalendarResponseSerializer` |
+| `AvailabilityView` | — | `AvailabilityResponseSerializer` |
+| `EventICSView` | — | (raw `text/calendar`) |
+
+### Events & functions (comm surface)
+
+| Kind | Name | Payload | Schema |
+|---|---|---|---|
+| Emit | `calendar.occurrence.materialized` | `{event_id, series_id, scope_key, owner_id, title, start, end}` | `schemas/emits/calendar.occurrence.materialized.json` |
+| Emit | `calendar.event.reminder_due` | `{event_id, scope_key, owner_id, title, start, offset_minutes, participant_ids, dedup_key}` | `schemas/emits/calendar.event.reminder_due.json` |
+| Function (provides) | `calendar.free_busy` | `{user_id, start, end, scope_key?}` -> `{busy: [{start, end}]}` | `schemas/functions/calendar.free_busy.json` |
+
+## Anti-patterns
+
+- **Don't create app resources inside the recurrence engine.** Subscribe to
+  `calendar.occurrence.materialized` instead — that boundary is the whole
+  point of this module.
+- **Don't add a `notified` boolean.** Reminders are event-driven; dedup
+  belongs to the delivering consumer via `dedup_key`.
+- **Don't compute monthly recurrence with `timedelta(days=30)`.** Use a
+  preset -> RRULE; `FREQ=MONTHLY` is calendar-correct (month-end handled).
+- **Don't put workspace/org FKs on `Event`.** The scope is the opaque
+  `scope_key`; resolution is the `SCOPE_PROVIDER` seam.
+- **Don't import other stapel modules** — cross-module is comm by string name.
+- **Don't bypass the settings namespace** with `os.getenv` at import time.
+
+## App-layer override vs upstream contribution — rule of thumb
+
+**App-layer** (host project, no fork) if the change fits a seam above: a
+settings key, a subclass + URL remount, a comm subscriber, a custom preset.
+
+**Upstream contribution** if it needs new model fields/migrations, new
+endpoints, a new settings key or seam, or changes a committed schema.
+
+Litmus test: if you'd have to monkeypatch or edit code inside
+`stapel_calendar/` — it's upstream. If a setting, subclass, receiver or comm
+call gets you there — it's app-layer.

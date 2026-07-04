@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "calendar.occurrence.materialized",
+  "description": "A recurring occurrence gained its own state and was persisted. App-layers subscribe to attach a resource (e.g. a video room). The recurrence engine creates no app resource itself.",
+  "type": "object",
+  "required": ["event_id", "series_id", "owner_id", "start", "end"],
+  "properties": {
+    "event_id":  { "type": "string", "format": "uuid" },
+    "series_id": { "type": "string", "format": "uuid" },
+    "scope_key": { "type": "string" },
+    "owner_id":  { "type": "string" },
+    "title":     { "type": "string" },
+    "start":     { "type": "string", "format": "date-time" },
+    "end":       { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": true
+}

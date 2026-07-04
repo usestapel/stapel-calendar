@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "calendar.free_busy",
+  "description": "Busy intervals for a user over a range — a scheduling primitive other services call synchronously.",
+  "type": "object",
+  "required": ["user_id", "start", "end"],
+  "properties": {
+    "user_id":   { "type": "string" },
+    "start":     { "type": "string", "format": "date-time" },
+    "end":       { "type": "string", "format": "date-time" },
+    "scope_key": { "type": ["string", "null"] }
+  },
+  "additionalProperties": false
+}

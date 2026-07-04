@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "calendar.event.reminder_due",
+  "description": "A reminder for an event is due (start minus a configured offset). stapel-notifications (or any subscriber) delivers it; dedup uses dedup_key.",
+  "type": "object",
+  "required": ["event_id", "start", "offset_minutes", "dedup_key"],
+  "properties": {
+    "event_id":        { "type": "string", "format": "uuid" },
+    "scope_key":       { "type": "string" },
+    "owner_id":        { "type": "string" },
+    "title":           { "type": "string" },
+    "start":           { "type": "string", "format": "date-time" },
+    "offset_minutes":  { "type": "integer", "minimum": 0 },
+    "participant_ids": { "type": "array", "items": { "type": "string" } },
+    "dedup_key":       { "type": "string" }
+  },
+  "additionalProperties": true
+}
