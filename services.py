@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from stapel_core.comm import emit
 
 from .models import BUSY_RSVP, Event, Participant, RSVP
@@ -137,64 +137,83 @@ def expand_event(
     return out
 
 
+def _find_occurrence(series: Event, occurrence_start: datetime):
+    return series.occurrences.filter(start=occurrence_start).first()
+
+
 def materialize(series: Event, occurrence_start: datetime) -> Event:
     """Persist a single occurrence of ``series`` so it can gain its own state
     (RSVP, resource). Idempotent: a second call for the same start returns
     the existing row. Emits ``calendar.occurrence.materialized`` (and the
     ``occurrence_materialized`` Django signal) — this engine creates **no**
     app resource itself.
+
+    Concurrency-safe: the ``(recurrence_parent, start)`` partial unique
+    constraint guarantees at most one occurrence per instant. Two concurrent
+    materialize calls for the same slot (the normal concurrent-booking case)
+    both see no existing row, race to ``create()``, and the loser catches the
+    ``IntegrityError``, re-queries and returns the winner's row — **without**
+    re-emitting the event or re-sending the signal (the winner already did).
     """
     if not series.is_series_master:
         raise ValueError("can only materialize occurrences of a series master")
 
-    existing = series.occurrences.filter(start=occurrence_start).first()
+    existing = _find_occurrence(series, occurrence_start)
     if existing is not None:
         return existing
 
     occurrence_end = occurrence_start + series.duration
-    with transaction.atomic():
-        occurrence = Event.objects.create(
-            owner=series.owner,
-            title=series.title,
-            description=series.description,
-            start=occurrence_start,
-            end=occurrence_end,
-            scope_key=series.scope_key,
-            status=series.status,
-            rrule="",
-            recurrence_type="none",
-            recurrence_parent=series,
-        )
-        # Batch-copy participants (RSVP reset to invited except the owner).
-        rows = [
-            Participant(
-                event=occurrence,
-                user_id=uid,
-                rsvp=RSVP.ACCEPTED if uid == series.owner_id else RSVP.INVITED,
+    try:
+        with transaction.atomic():
+            occurrence = Event.objects.create(
+                owner=series.owner,
+                title=series.title,
+                description=series.description,
+                start=occurrence_start,
+                end=occurrence_end,
+                scope_key=series.scope_key,
+                status=series.status,
+                rrule="",
+                recurrence_type="none",
+                recurrence_parent=series,
             )
-            for uid in series.participants.values_list("user_id", flat=True)
-        ]
-        if rows:
-            Participant.objects.bulk_create(rows, ignore_conflicts=True)
+            # Batch-copy participants (RSVP reset to invited except the owner).
+            rows = [
+                Participant(
+                    event=occurrence,
+                    user_id=uid,
+                    rsvp=RSVP.ACCEPTED if uid == series.owner_id else RSVP.INVITED,
+                )
+                for uid in series.participants.values_list("user_id", flat=True)
+            ]
+            if rows:
+                Participant.objects.bulk_create(rows, ignore_conflicts=True)
 
-        emit(
-            "calendar.occurrence.materialized",
-            {
-                "event_id": str(occurrence.id),
-                "series_id": str(series.id),
-                "scope_key": occurrence.scope_key,
-                "owner_id": str(series.owner_id),
-                "title": occurrence.title,
-                "start": occurrence.start.isoformat(),
-                "end": occurrence.end.isoformat(),
-            },
-            key=str(series.id),
-        )
-        from .signals import occurrence_materialized
+            emit(
+                "calendar.occurrence.materialized",
+                {
+                    "event_id": str(occurrence.id),
+                    "series_id": str(series.id),
+                    "scope_key": occurrence.scope_key,
+                    "owner_id": str(series.owner_id),
+                    "title": occurrence.title,
+                    "start": occurrence.start.isoformat(),
+                    "end": occurrence.end.isoformat(),
+                },
+                key=str(series.id),
+            )
+            from .signals import occurrence_materialized
 
-        occurrence_materialized.send(
-            sender=Event, occurrence=occurrence, series=series
-        )
+            occurrence_materialized.send(
+                sender=Event, occurrence=occurrence, series=series
+            )
+    except IntegrityError:
+        # Lost the race — a concurrent materialize created the occurrence
+        # first (and already emitted). Return its row; do not re-emit.
+        winner = _find_occurrence(series, occurrence_start)
+        if winner is not None:
+            return winner
+        raise
     return occurrence
 
 

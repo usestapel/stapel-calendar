@@ -146,6 +146,22 @@ class TestExpansionCap:
         )
         assert len(occs) == 10
 
+    def test_cap_bounds_computation_not_just_result(self):
+        """An unbounded daily rule over a ~1000-year range must return exactly
+        max_occurrences and stop — the lazy xafter iteration means we never
+        compute the ~365k intervals the full range would contain."""
+        dtstart = datetime(2026, 1, 1, tzinfo=UTC)
+        occs = expand_rule(
+            "FREQ=DAILY",
+            dtstart,
+            timedelta(hours=1),
+            dtstart,
+            datetime(3000, 1, 1, tzinfo=UTC),  # enormous range end
+            max_occurrences=5,
+        )
+        assert len(occs) == 5
+        assert occs[-1].start == datetime(2026, 1, 5, tzinfo=UTC)
+
 
 class TestPresetRegistry:
     """Extension seam #4 — custom recurrence presets beyond the built-ins."""

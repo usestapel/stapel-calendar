@@ -24,21 +24,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from dateutil.rrule import (
-    DAILY,
-    FR,
-    MO,
-    MONTHLY,
-    TH,
-    TU,
-    WE,
-    WEEKLY,
-    rrule,
-    rrulestr,
-)
+from dateutil.rrule import DAILY, MONTHLY, WEEKLY, rrule, rrulestr
 
-# 0=Mon..6=Sun -> dateutil weekday objects (BYDAY tokens).
-_WEEKDAY_OBJECTS = (MO, TU, WE, TH, FR)  # index by isoweekday-1 for the first 5
+# 0=Mon..6=Sun -> RFC 5545 BYDAY tokens.
 _BYDAY_TOKENS = ("MO", "TU", "WE", "TH", "FR", "SA", "SU")
 _FREQ_TOKENS = {DAILY: "DAILY", WEEKLY: "WEEKLY", MONTHLY: "MONTHLY"}
 
@@ -204,6 +192,11 @@ def expand_rule(
     Returns occurrences whose start falls in the window (inclusive), capped
     at ``max_occurrences`` (defaults to the ``MAX_EXPANSION_OCCURRENCES``
     setting). Nothing is persisted.
+
+    Iterates lazily via ``rrule.xafter`` and stops at the cap or the range
+    end — so an unbounded rule (e.g. ``FREQ=DAILY`` with no UNTIL/COUNT) over
+    a huge range never computes more than ``max_occurrences`` instants. The
+    cap is a real work bound, not a post-hoc trim.
     """
     from .conf import calendar_settings
 
@@ -212,7 +205,9 @@ def expand_rule(
 
     rule = parse_rrule(rule_text, dtstart)
     out: list[Occurrence] = []
-    for occ_start in rule.between(range_start, range_end, inc=True):
+    for occ_start in rule.xafter(range_start, inc=True):
+        if occ_start > range_end:
+            break
         out.append(
             Occurrence(
                 event_id=event_id,

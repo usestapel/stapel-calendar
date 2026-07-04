@@ -2,6 +2,7 @@
 invariant: the engine emits `calendar.occurrence.materialized` and creates NO
 app resource itself (the coupling this extraction removes)."""
 from datetime import datetime
+from unittest import mock
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -103,6 +104,31 @@ class TestMaterialize:
         )
         assert evt.payload["series_id"] == str(series.id)
         assert evt.payload["event_id"] == str(occ.id)
+
+    def test_concurrent_materialize_returns_winner_row(self, user, captured_events):
+        """The concurrent-booking case: two materialize calls for the same
+        slot. The winner creates + emits; the loser's create() hits the
+        (recurrence_parent, start) unique constraint, catches IntegrityError,
+        re-queries and returns the winner's row — no duplicate, no 500, no
+        second emit."""
+        series = _series(user)
+        occ_start = datetime(2026, 1, 12, 9, 0, tzinfo=UTC)
+        winner = services.materialize(series, occ_start)  # first (winner)
+        n_events = Event.objects.count()
+
+        # Force the loser's pre-check to miss so create() actually runs and
+        # collides with the winner's row; the except path then re-queries.
+        with mock.patch.object(
+            services, "_find_occurrence", side_effect=[None, winner]
+        ) as finder:
+            loser = services.materialize(series, occ_start)
+
+        assert loser.id == winner.id  # returned the winner's row, not a raise
+        assert Event.objects.count() == n_events  # no duplicate occurrence
+        assert finder.call_count == 2  # pre-check miss + post-conflict re-query
+        # Exactly one occurrence.materialized emit across both calls (winner's).
+        names = [e.event_type for e in captured_events]
+        assert names.count("calendar.occurrence.materialized") == 1
 
 
 @pytest.mark.django_db

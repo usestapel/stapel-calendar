@@ -31,6 +31,22 @@ generalized so both flavors of the domain — *meetings* (legacy) and
   reminder policy (`REMINDER_POLICY`), scope provider (`SCOPE_PROVIDER`),
   recurrence presets (`PRESETS`). System checks on all seam config.
 
+### Fixed (adversarial review)
+- **Concurrent-materialize idempotency** — `materialize()` now handles the
+  race where two callers materialize the same occurrence at once (the normal
+  concurrent-booking case): the loser catches the `IntegrityError` from the
+  `(recurrence_parent, start)` unique constraint, re-queries and returns the
+  winner's row without re-emitting `calendar.occurrence.materialized`. Was a
+  possible unhandled 500 under concurrency.
+- **Bounded expansion** — `expand_rule` iterates lazily via `rrule.xafter`
+  and stops at `max_occurrences`/range-end, so an unbounded rule over a huge
+  range no longer computes the full in-range set before the cap trims it.
+- **GDPR** — added a `user.deleted` consumer (`actions.py` +
+  `CalendarGDPRProvider`) that erases the user's owned events (cascading to
+  occurrences/participants), participations and availability windows;
+  consumes schema in `schemas/consumes/`.
+- Removed dead `_WEEKDAY_OBJECTS` in `recurrence.py`.
+
 ### Fixed (recurrence-correctness — vs the legacy source)
 - **Monthly recurrence** now uses `FREQ=MONTHLY` (calendar-correct: a series
   on the 31st yields Mar/May/… and skips short months) instead of the
