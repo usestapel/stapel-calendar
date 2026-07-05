@@ -104,6 +104,14 @@ class Event(models.Model):
         on_delete=models.CASCADE,
         related_name="occurrences",
     )
+    # RFC 5545 RECURRENCE-ID analog: the *original* rule instant this
+    # materialized occurrence stands for. Stays fixed when the occurrence is
+    # rescheduled (start/end move, recurrence_id does not), so expansion can
+    # keep suppressing the virtual occurrence at the original instant — a
+    # moved occurrence never contributes busy time twice. A CANCELLED row at
+    # a recurrence_id is the EXDATE analog (a tombstone). Null on masters
+    # and standalone events.
+    recurrence_id = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -116,10 +124,11 @@ class Event(models.Model):
             models.Index(fields=["recurrence_parent"], name="cal_event_parent"),
         ]
         constraints = [
-            # A materialized occurrence must not itself carry an RRULE, and a
-            # given series can hold at most one materialized child per start.
+            # A given series can hold at most one materialized child per
+            # *rule instant* (recurrence_id, not start — a rescheduled
+            # occurrence keeps claiming its original instant).
             models.UniqueConstraint(
-                fields=["recurrence_parent", "start"],
+                fields=["recurrence_parent", "recurrence_id"],
                 condition=models.Q(recurrence_parent__isnull=False),
                 name="cal_event_uniq_occurrence",
             ),

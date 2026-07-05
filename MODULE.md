@@ -18,9 +18,22 @@
   **virtual expansion** (compute a range for display, nothing persisted)
   and **on-demand materialization** (persist an occurrence only when it
   gains its own state — an RSVP or a host resource), with a series↔occurrence
-  link.
+  link. Interval math is instant-based (DST gap/fold safe); occurrence
+  instants are compared in UTC (PEP 495 safe).
+- **Cancellation/reschedule model (EXDATE / RECURRENCE-ID analog)** — a
+  materialized occurrence claims its original rule instant via
+  `Event.recurrence_id`; `status=CANCELLED` at an instant is a *tombstone*
+  (skipped by expansion and free/busy, cannot resurrect). Cancel one
+  instant with `services.cancel_occurrence()` or `DELETE /api/events/{id}`
+  on the materialized occurrence (which tombstones, not deletes).
+  Rescheduling = move the row's `start`/`end`; `recurrence_id` keeps
+  suppressing the original instant so busy never doubles.
 - **Availability** — recurring working windows + free/busy query + slot
-  computation (the booking primitive).
+  computation (the booking primitive). Expansions that hit
+  `MAX_EXPANSION_OCCURRENCES` inside the range report `truncated` (the
+  `*_detailed` service variants, the availability response and the
+  `calendar.free_busy` output) — never treat the tail of a truncated
+  range as free.
 - **ICS export** — RFC 5545 VCALENDAR/VEVENT, with a minimal parser for a
   round-trip.
 - **API** — events CRUD, `respond` (RSVP), user-calendar (events + expanded
@@ -46,6 +59,19 @@ itself** — legacy's app-layer subscribes and creates a `Room`, pinning it
 to the occurrence via the emitted `event_id`. This is the exact coupling the
 extraction removed (the source created `rooms.models.Room` inside the
 recurrence loop). Schema: `schemas/emits/calendar.occurrence.materialized.json`.
+
+Two hook caveats:
+
+- **Tombstones don't fire the hook.** `cancel_occurrence()` on a
+  not-yet-materialized instant persists the cancelled row *without*
+  emitting — a cancelled instant must not trigger resource creation.
+- **With `OUTBOX_ENABLED=False`** (synchronous in-process delivery) the
+  emit and the Django signal fire *inside* the materialize transaction: if
+  a signal subscriber then raises, the occurrence row rolls back but the
+  emit was already delivered — a phantom `calendar.occurrence.materialized`
+  for a row that does not exist. With the outbox enabled, delivery is
+  transactional and this cannot happen. Keep signal subscribers
+  non-throwing, or run with the outbox in production.
 
 ### 2. Reminder policy — `REMINDER_POLICY` (dotted path, replace)
 
@@ -104,7 +130,24 @@ setting -> environment variable -> default. Read lazily at call time.
 |---|---|---|---|
 | Emit | `calendar.occurrence.materialized` | `{event_id, series_id, scope_key, owner_id, title, start, end}` | `schemas/emits/calendar.occurrence.materialized.json` |
 | Emit | `calendar.event.reminder_due` | `{event_id, scope_key, owner_id, title, start, offset_minutes, participant_ids, dedup_key}` | `schemas/emits/calendar.event.reminder_due.json` |
-| Function (provides) | `calendar.free_busy` | `{user_id, start, end, scope_key?}` -> `{busy: [{start, end}]}` | `schemas/functions/calendar.free_busy.json` |
+| Function (provides) | `calendar.free_busy` | `{user_id, start, end, scope_key?}` -> `{busy: [{start, end}], truncated}` | `schemas/functions/calendar.free_busy.json` |
+
+### API contract notes
+
+- **`CalendarView` returns a materialized occurrence twice by design**: as
+  a concrete row in `events[]` (it *is* an Event) and as an entry in
+  `occurrences[]` (`is_materialized=true`). Clients must dedup by
+  `occurrences[].materialized_id == events[].id`. Cancelled (tombstoned)
+  occurrences appear only in `events[]` with `status=cancelled`, never in
+  `occurrences[]`.
+- **Zero-duration events** (`end == start`) are valid markers: they are
+  stored and listed but occupy no time — no busy interval, no slot-grid
+  effect. `end < start` is rejected with 400.
+- **Availability**: `slot_minutes` must be a positive integer (400
+  `error.400.calendar_invalid_slot_minutes` otherwise); the response's
+  `truncated=true` means a series expansion hit
+  `MAX_EXPANSION_OCCURRENCES` inside the range and later times only look
+  free.
 
 ## Anti-patterns
 
@@ -115,6 +158,14 @@ setting -> environment variable -> default. Read lazily at call time.
   belongs to the delivering consumer via `dedup_key`.
 - **Don't compute monthly recurrence with `timedelta(days=30)`.** Use a
   preset -> RRULE; `FREQ=MONTHLY` is calendar-correct (month-end handled).
+- **Don't hard-delete a materialized occurrence row** (ORM `.delete()`) —
+  the virtual occurrence at its instant resurrects and the slot becomes
+  busy again. Cancel it: `cancel_occurrence()` or the DELETE endpoint
+  (both tombstone via `status=CANCELLED` + `recurrence_id`).
+- **Don't do wall-clock datetime arithmetic on occurrence instants.** Use
+  `recurrence.add_duration()` (instant space; DST gap/fold safe) and
+  compare instants via `recurrence.as_utc()` (PEP 495: raw `==`/dict keys
+  miss on DST-transition wall times).
 - **Don't put workspace/org FKs on `Event`.** The scope is the opaque
   `scope_key`; resolution is the `SCOPE_PROVIDER` seam.
 - **Don't import other stapel modules** — cross-module is comm by string name.

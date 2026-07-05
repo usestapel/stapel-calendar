@@ -102,10 +102,14 @@ class AvailabilityResponse:
     Attributes:
         busy: Coalesced busy intervals in the range.
         slots: Open booking slots (empty if no availability windows set).
+        truncated: True when a series expansion hit the
+            MAX_EXPANSION_OCCURRENCES cap inside the range — times past the
+            cap only look free; don't book them blindly.
     """
 
     busy: List[IntervalResponse] = field(default_factory=list)
     slots: List[IntervalResponse] = field(default_factory=list)
+    truncated: bool = False
 
 
 # ── Request DTOs ────────────────────────────────────────────────────────

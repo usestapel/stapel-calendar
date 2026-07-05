@@ -28,11 +28,12 @@ from .errors import (
     ERR_400_INVALID_RANGE,
     ERR_400_INVALID_RECURRENCE,
     ERR_400_INVALID_RSVP,
+    ERR_400_INVALID_SLOT_MINUTES,
     ERR_403_NOT_EVENT_OWNER,
     ERR_404_EVENT_NOT_FOUND,
     ERR_404_NOT_INVITED,
 )
-from .models import Event, Participant, RSVP
+from .models import Event, EventStatus, Participant, RSVP
 from .recurrence import InvalidRecurrence
 from .scope import get_scope_provider
 from .serializers import (
@@ -211,6 +212,13 @@ class EventDetailView(SerializerSeamMixin, APIView):
             return StapelErrorResponse(404, ERR_404_EVENT_NOT_FOUND)
         if event.owner_id != request.user.id:
             return StapelErrorResponse(403, ERR_403_NOT_EVENT_OWNER)
+        if event.is_occurrence:
+            # Deleting a materialized occurrence must not resurrect the
+            # virtual one at its rule instant — tombstone it (the EXDATE
+            # analog) instead of removing the row.
+            event.status = EventStatus.CANCELLED
+            event.save(update_fields=["status", "updated_at"])
+            return StapelResponse({"status": "cancelled"})
         event.delete()
         return StapelResponse({"status": "deleted"})
 
@@ -312,18 +320,33 @@ class AvailabilityView(SerializerSeamMixin, APIView):
         except ValueError:
             return StapelErrorResponse(400, ERR_400_INVALID_RANGE)
         slot_raw = request.query_params.get("slot_minutes")
-        slot_minutes = int(slot_raw) if slot_raw else None
+        slot_minutes = None
+        if slot_raw:
+            # Reject non-numeric, zero and negative values up front — a
+            # step <= 0 would make the slot loop run forever (DoS).
+            try:
+                slot_minutes = int(slot_raw)
+            except (TypeError, ValueError):
+                return StapelErrorResponse(400, ERR_400_INVALID_SLOT_MINUTES)
+            if slot_minutes < 1:
+                return StapelErrorResponse(400, ERR_400_INVALID_SLOT_MINUTES)
 
-        busy = services.free_busy(request.user, start, end)
-        slots = services.compute_slots(
+        fb = services.free_busy_detailed(request.user, start, end)
+        slot_result = services.compute_slots_detailed(
             request.user, start, end, slot_minutes=slot_minutes
         )
         response_cls = self.get_response_serializer_class()
         return StapelResponse(
             response_cls(
                 AvailabilityResponse(
-                    busy=[IntervalResponse(start=i.start, end=i.end) for i in busy],
-                    slots=[IntervalResponse(start=i.start, end=i.end) for i in slots],
+                    busy=[
+                        IntervalResponse(start=i.start, end=i.end) for i in fb.busy
+                    ],
+                    slots=[
+                        IntervalResponse(start=i.start, end=i.end)
+                        for i in slot_result.slots
+                    ],
+                    truncated=fb.truncated or slot_result.truncated,
                 )
             )
         )

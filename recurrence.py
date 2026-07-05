@@ -21,8 +21,8 @@ rules beyond the built-ins). Setting a name to ``None`` removes a built-in.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timedelta
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 
 from dateutil.rrule import DAILY, MONTHLY, WEEKLY, rrule, rrulestr
 
@@ -33,6 +33,37 @@ _FREQ_TOKENS = {DAILY: "DAILY", WEEKLY: "WEEKLY", MONTHLY: "MONTHLY"}
 
 class InvalidRecurrence(ValueError):
     """Raised when a preset/RRULE cannot be built or parsed."""
+
+
+def as_utc(dt: datetime) -> datetime:
+    """Normalize an aware datetime to UTC; return a naive one unchanged.
+
+    Used everywhere occurrence instants are *compared* (dedup keys,
+    rule-membership checks). PEP 495 makes ``==``/``hash`` of inter-zone
+    aware datetimes return unequal for gap/ambiguous wall times, so raw
+    dict lookups mixing DB-UTC and ZoneInfo-local keys silently miss on
+    DST-transition instants — normalizing both sides to UTC restores
+    instant semantics.
+    """
+    if dt.tzinfo is None:
+        return dt
+    return dt.astimezone(timezone.utc)
+
+
+def add_duration(start: datetime, duration: timedelta) -> datetime:
+    """``start + duration`` in *instant* (UTC) space, not wall-clock.
+
+    Naive/UTC datetimes are unaffected. For a ZoneInfo-aware ``start``,
+    plain ``start + duration`` is wall-clock arithmetic: across a DST gap
+    it can produce ``end < start`` (spring-forward: start resolves with
+    the pre-transition offset, end with the post-transition one) and
+    across a fold it inflates the duration (fall-back). Doing the addition
+    on the UTC instant keeps the duration exact, then converts back to the
+    original timezone for display.
+    """
+    if start.tzinfo is None:
+        return start + duration
+    return (start.astimezone(timezone.utc) + duration).astimezone(start.tzinfo)
 
 
 # ── Preset registry (extension seam #4) ─────────────────────────────────
@@ -107,17 +138,36 @@ def build_rrule(
     byweekday=None,
     until: datetime | None = None,
     count: int | None = None,
+    dtstart: datetime | None = None,
 ) -> str:
     """Build a canonical RRULE string (no DTSTART) for ``preset``.
 
     Returns ``""`` for the ``none`` preset. Raises :class:`InvalidRecurrence`
-    for unknown presets or a ``custom`` preset without weekdays.
+    for unknown presets, a ``custom`` preset without weekdays, or ``count``
+    and ``until`` together (RFC 5545 §3.3.10 forbids both in one rule).
+
+    ``dtstart`` (the series start) is the timezone context for ``until``:
+
+    - aware ``until`` — converted to UTC (``Z`` form). Requires an aware
+      ``dtstart`` if one is given: dateutil rejects a UTC UNTIL against a
+      naive DTSTART at *expand* time, which would poison every later
+      expansion of the stored series — so it is caught here, at build time.
+    - naive ``until`` with an aware ``dtstart`` — interpreted in the
+      series' timezone, then converted to UTC (not blindly stamped ``Z``).
+    - naive ``until`` with a naive ``dtstart`` — kept naive (wall-clock
+      host, RFC "floating" time).
+    - naive ``until`` without ``dtstart`` — rejected: no timezone context
+      to interpret it in.
     """
     presets = get_presets()
     if preset == "none":
         return ""
     if preset not in presets:
         raise InvalidRecurrence(f"unknown recurrence preset: {preset!r}")
+    if count is not None and until is not None:
+        raise InvalidRecurrence(
+            "count and until are mutually exclusive (RFC 5545 §3.3.10)"
+        )
 
     base = dict(presets[preset])
     freq = base.get("freq", WEEKLY)
@@ -139,14 +189,32 @@ def build_rrule(
     if count is not None:
         parts.append(f"COUNT={int(count)}")
     if until is not None:
-        # RFC 5545 UNTIL in UTC (Z form).
-        u = until
-        if u.tzinfo is not None:
-            from datetime import timezone as _tz
-
-            u = u.astimezone(_tz.utc)
-        parts.append(f"UNTIL={u.strftime('%Y%m%dT%H%M%SZ')}")
+        parts.append(f"UNTIL={_format_until(until, dtstart)}")
     return ";".join(parts)
+
+
+def _format_until(until: datetime, dtstart: datetime | None) -> str:
+    """Render UNTIL per RFC 5545, using ``dtstart`` as timezone context."""
+    dtstart_naive = dtstart is not None and dtstart.tzinfo is None
+    if until.tzinfo is None:
+        if dtstart is None:
+            raise InvalidRecurrence(
+                "naive until requires dtstart for timezone context"
+            )
+        if dtstart_naive:
+            # Floating-time host: keep UNTIL floating too (no Z).
+            return until.strftime("%Y%m%dT%H%M%S")
+        # Interpret the naive until in the series' timezone, then to UTC.
+        until = until.replace(tzinfo=dtstart.tzinfo)
+    elif dtstart_naive:
+        # dateutil raises "RRULE UNTIL values must be specified in UTC when
+        # DTSTART is timezone-aware" (and the naive-DTSTART converse) only
+        # at expand time — reject at build time instead of storing a series
+        # that 500s every later expansion.
+        raise InvalidRecurrence(
+            "aware until with a naive event start: make both naive or both aware"
+        )
+    return until.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
 def parse_rrule(rule_text: str, dtstart: datetime) -> rrule:
@@ -177,7 +245,19 @@ class Occurrence:
     materialized_id: object = None
 
 
-def expand_rule(
+@dataclass(frozen=True)
+class Expansion:
+    """Result of a virtual expansion: the occurrences plus a ``truncated``
+    flag — True when the ``max_occurrences`` cap cut the expansion short of
+    the requested range end (instants past the cap exist but were not
+    computed). Callers doing availability math must surface this: a silently
+    capped expansion makes everything past the cap look free."""
+
+    occurrences: list[Occurrence] = field(default_factory=list)
+    truncated: bool = False
+
+
+def expand_rule_detailed(
     rule_text: str,
     dtstart: datetime,
     duration: timedelta,
@@ -186,12 +266,17 @@ def expand_rule(
     *,
     event_id=None,
     max_occurrences: int | None = None,
-) -> list[Occurrence]:
+) -> Expansion:
     """Virtually expand an RRULE across ``[range_start, range_end]``.
 
     Returns occurrences whose start falls in the window (inclusive), capped
     at ``max_occurrences`` (defaults to the ``MAX_EXPANSION_OCCURRENCES``
-    setting). Nothing is persisted.
+    setting), plus a ``truncated`` flag when the cap was hit with more
+    in-range instants remaining. Nothing is persisted.
+
+    Occurrence ends are computed in instant (UTC) space via
+    :func:`add_duration` — wall-clock arithmetic across a DST gap produced
+    inverted intervals (``end < start``) and inflated ones across a fold.
 
     Iterates lazily via ``rrule.xafter`` and stops at the cap or the range
     end — so an unbounded rule (e.g. ``FREQ=DAILY`` with no UNTIL/COUNT) over
@@ -205,16 +290,56 @@ def expand_rule(
 
     rule = parse_rrule(rule_text, dtstart)
     out: list[Occurrence] = []
-    for occ_start in rule.xafter(range_start, inc=True):
+    truncated = False
+    iterator = rule.xafter(range_start, inc=True)
+    for occ_start in iterator:
         if occ_start > range_end:
             break
         out.append(
             Occurrence(
                 event_id=event_id,
                 start=occ_start,
-                end=occ_start + duration,
+                end=add_duration(occ_start, duration),
             )
         )
         if len(out) >= max_occurrences:
+            nxt = next(iterator, None)
+            truncated = nxt is not None and nxt <= range_end
             break
-    return out
+    return Expansion(occurrences=out, truncated=truncated)
+
+
+def expand_rule(
+    rule_text: str,
+    dtstart: datetime,
+    duration: timedelta,
+    range_start: datetime,
+    range_end: datetime,
+    *,
+    event_id=None,
+    max_occurrences: int | None = None,
+) -> list[Occurrence]:
+    """List-only variant of :func:`expand_rule_detailed` (drops the
+    ``truncated`` flag)."""
+    return expand_rule_detailed(
+        rule_text,
+        dtstart,
+        duration,
+        range_start,
+        range_end,
+        event_id=event_id,
+        max_occurrences=max_occurrences,
+    ).occurrences
+
+
+def is_rule_instant(rule_text: str, dtstart: datetime, instant: datetime) -> bool:
+    """True iff ``instant`` is an occurrence instant of the rule (compared
+    in UTC space, so gap/ambiguous DST wall times still match — see
+    :func:`as_utc`). Instants past UNTIL/COUNT are not instants."""
+    rule = parse_rrule(rule_text, dtstart)
+    try:
+        candidate = next(rule.xafter(instant, inc=True), None)
+    except TypeError as exc:
+        # naive/aware mix between the series start and the queried instant.
+        raise InvalidRecurrence(str(exc)) from exc
+    return candidate is not None and as_utc(candidate) == as_utc(instant)

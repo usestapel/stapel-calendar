@@ -24,7 +24,10 @@ def free_busy(payload):
 
     Input: ``{"user_id": str, "start": iso8601, "end": iso8601,
               "scope_key": str?}``.
-    Output: ``{"busy": [{"start": iso8601, "end": iso8601}, ...]}``.
+    Output: ``{"busy": [{"start": iso8601, "end": iso8601}, ...],
+               "truncated": bool}`` — ``truncated`` is True when a series
+    expansion hit the ``MAX_EXPANSION_OCCURRENCES`` cap inside the range
+    (times past the cap only look free).
     """
     from django.contrib.auth import get_user_model
     from django.utils.dateparse import parse_datetime
@@ -36,9 +39,11 @@ def free_busy(payload):
     start = parse_datetime(payload["start"])
     end = parse_datetime(payload["end"])
     scope_key = payload.get("scope_key")
-    busy = services.free_busy(user, start, end, scope_key=scope_key)
+    result = services.free_busy_detailed(user, start, end, scope_key=scope_key)
     return {
         "busy": [
-            {"start": i.start.isoformat(), "end": i.end.isoformat()} for i in busy
-        ]
+            {"start": i.start.isoformat(), "end": i.end.isoformat()}
+            for i in result.busy
+        ],
+        "truncated": result.truncated,
     }
