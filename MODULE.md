@@ -149,6 +149,21 @@ setting -> environment variable -> default. Read lazily at call time.
   `MAX_EXPANSION_OCCURRENCES` inside the range and later times only look
   free.
 
+### Admin categories — `@access` declarations (admin-suite AS-5)
+
+Every model in `models.py` carries (or implicitly defaults to) a
+`stapel_core.access.access` category — one declaration, consumed by admin
+visibility, default staff rights, and the audit report (admin-suite §0).
+Undecorated = `business` (visible, staff-manageable) and is the correct,
+zero-effort default for domain tables.
+
+All three models here (`Event`, `Participant`, `AvailabilityWindow`) are
+`business` and stay undecorated — none fit `ops` (outbox/dedup/audit-log/
+TTL-junk machinery, nobody-edits-this-through-the-admin journals) or `secret`
+(token/key/credential carriers). No ICS-feed access token, calendar-sync
+webhook secret, or external-sync dedup/audit-log model exists in this
+library to warrant otherwise.
+
 ## Anti-patterns
 
 - **Don't create app resources inside the recurrence engine.** Subscribe to
