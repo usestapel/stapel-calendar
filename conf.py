@@ -11,7 +11,7 @@ Dotted-path keys listed in ``import_strings`` are resolved with
 The four documented extension seams (see MODULE.md):
 
 - ``SCOPE_PROVIDER`` — resolves/filters the opaque ``scope_key`` from the
-  request (legacy supplies ``workspace_id``). The library itself is
+  request (a host may supply e.g. ``workspace_id``). The library itself is
   scope-agnostic.
 - ``REMINDER_POLICY`` — decides *when* and *what* to remind; the default
   emits ``calendar.event.reminder_due`` for stapel-notifications to deliver.
@@ -45,7 +45,7 @@ calendar_settings = AppSettings(
         "REMINDER_POLICY": "stapel_calendar.reminders.DefaultReminderPolicy",
         # Dotted path to a ScopeProvider — resolves the opaque scope_key
         # from a request and filters querysets by it. The default is a
-        # no-op (single global scope); legacy returns workspace_id.
+        # no-op (single global scope); a host may return e.g. workspace_id.
         "SCOPE_PROVIDER": "stapel_calendar.scope.DefaultScopeProvider",
         # Recurrence presets merged OVER recurrence.BUILTIN_PRESETS. A value
         # is a dict of dateutil.rrule kwargs (freq/interval/byweekday/...);

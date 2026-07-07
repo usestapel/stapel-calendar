@@ -1,7 +1,7 @@
 """Reminder policy — extension seam #2.
 
-Replaces legacy's dead ``notified`` boolean (and the absent scheduler)
-with an **event-driven** design: a host cron calls :func:`run_reminders`
+Replaces a dead ``notified`` boolean (and the absent scheduler) with an
+**event-driven** design: a host cron calls :func:`run_reminders`
 on an interval; the configured ``ReminderPolicy`` decides which reminders
 are due and emits ``calendar.event.reminder_due`` for stapel-notifications
 (or any subscriber) to deliver. Dedup is the consumer's job — every emit

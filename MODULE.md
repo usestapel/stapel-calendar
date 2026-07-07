@@ -43,7 +43,7 @@
   hook) and `calendar.event.reminder_due` (reminder delivery); provides the
   `calendar.free_busy` Function.
 
-**Meetings vs bookings.** These are two flavors of one domain. legacy
+**Meetings vs bookings.** These are two flavors of one domain. A host app
 supplies the *meetings* flavor (an occurrence's resource is a video Room);
 the roadmap's *bookings* flavor uses the same core (availability windows +
 slots + RSVP). Everything flavor-specific is pushed to the seams below.
@@ -55,7 +55,7 @@ slots + RSVP). Everything flavor-specific is pushed to the seams below.
 When a recurring occurrence is materialized, the engine emits
 `calendar.occurrence.materialized` (and sends the `occurrence_materialized`
 Django signal for in-process hosts). **The engine creates no app resource
-itself** — legacy's app-layer subscribes and creates a `Room`, pinning it
+itself** — the app-layer subscribes and creates a `Room`, pinning it
 to the occurrence via the emitted `event_id`. This is the exact coupling the
 extraction removed (the source created `rooms.models.Room` inside the
 recurrence loop). Schema: `schemas/emits/calendar.occurrence.materialized.json`.
@@ -86,7 +86,7 @@ notifications module's job. Subclass to change cadence/channel.
 
 A `ScopeProvider` (`resolve(request) -> scope_key`, `filter(qs, request)`)
 resolves the opaque scope from the request and filters querysets. Default is
-a no-op single global scope; legacy returns the active `workspace_id`.
+a no-op single global scope; a host may return the active `workspace_id`.
 
 ### 4. Recurrence presets — `STAPEL_CALENDAR["PRESETS"]` + `register_preset()` (open registry, MERGE)
 

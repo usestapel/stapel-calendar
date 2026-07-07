@@ -1,6 +1,6 @@
 """Recurrence engine correctness — the extraction's highest-risk area.
 
-The legacy source used ``timedelta(days=30)`` for monthly (wrong) and a
+The prior source used ``timedelta(days=30)`` for monthly (wrong) and a
 raw CSV for custom weekdays. These tests pin the RFC 5545 / dateutil
 behavior, including the month-end and DST edge cases that broke the source.
 """

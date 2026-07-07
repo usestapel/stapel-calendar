@@ -85,7 +85,7 @@ class TestMaterialize:
 
     def test_engine_creates_no_app_resource(self, user, captured_events):
         """The recurrence engine must ONLY create Event + Participant rows and
-        emit the hook — never an app resource (legacy's Room is an app-layer
+        emit the hook — never an app resource (creating a Room is an app-layer
         subscriber's job). We assert exactly one occurrence event and the emit."""
         series = _series(user, participant_ids=[])
         n_events_before = Event.objects.count()

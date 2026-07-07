@@ -4,8 +4,8 @@ The library is scope-agnostic: ``Event.scope_key`` is an opaque string the
 host owns. A ``ScopeProvider`` (dotted path in
 ``STAPEL_CALENDAR["SCOPE_PROVIDER"]``) resolves the scope_key from the
 current request and filters querysets by it. The default is a no-op single
-global scope; legacy's provider returns the active ``workspace_id`` and
-filters events to that workspace.
+global scope; a host provider might return the active ``workspace_id`` and
+filter events to that workspace.
 """
 from __future__ import annotations
 

@@ -1,7 +1,6 @@
 """Recurrence engine — RFC 5545 (iCalendar) RRULE as the canonical spec.
 
-This replaces legacy's buggy ad-hoc engine
-(``calendar_app/services.py``), whose smells were:
+This replaces a prior buggy ad-hoc engine, whose smells were:
 
 - ``monthly`` implemented as ``timedelta(days=30)`` — drifts off the
   day-of-month and desyncs over a year. Here ``monthly`` is
@@ -113,7 +112,7 @@ def get_presets() -> dict[str, dict | None]:
 
 def normalize_weekdays(weekdays) -> list[int]:
     """Coerce a CSV string / iterable of ints into a sorted unique list of
-    0=Mon..6=Sun ints. Replaces legacy's raw ``recurrence_days`` CSV."""
+    0=Mon..6=Sun ints. Replaces a raw ``recurrence_days`` CSV."""
     if weekdays is None:
         return []
     if isinstance(weekdays, str):

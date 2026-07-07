@@ -7,7 +7,7 @@ Registration happens on import from ``apps.py:ready()``.
 Emits (see schemas/emits/):
 - ``calendar.occurrence.materialized`` — a recurring occurrence gained its
   own state and was persisted; app-layers subscribe to attach a resource
-  (legacy creates a Room). The engine creates no resource itself.
+  (e.g. creating a meeting Room). The engine creates no resource itself.
 - ``calendar.event.reminder_due`` — a reminder for an event is due;
   stapel-notifications delivers it.
 

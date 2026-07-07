@@ -5,7 +5,7 @@ expansion (virtual) + materialization (on-demand), and availability
 (free/busy + slot computation). No app resources are created here — when an
 occurrence is materialized the engine *emits* ``calendar.occurrence.materialized``
 and the app-layer subscriber owns any resource creation (the coupling this
-extraction removes: legacy used to create a ``rooms.Room`` inside the
+extraction removes: a ``rooms.Room`` used to be created directly inside the
 recurrence loop).
 """
 from __future__ import annotations
@@ -82,8 +82,8 @@ def create_event(
 
 
 def _set_participants(event: Event, owner, participant_ids) -> None:
-    """Batch-create participants: owner accepted, the rest invited. Replaces
-    legacy's per-loop ``create`` calls."""
+    """Batch-create participants: owner accepted, the rest invited (replaces
+    per-loop ``create`` calls)."""
     rows = [Participant(event=event, user=owner, rsvp=RSVP.ACCEPTED)]
     seen = {str(owner.pk)}
     for uid in participant_ids:

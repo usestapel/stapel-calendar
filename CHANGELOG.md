@@ -147,9 +147,9 @@ see the migration notes below.
 ## [0.1.0] — 2026-07-05
 
 Initial release. Generic calendar/recurrence/scheduling core extracted from
-the legacy backend (`calendar_app`) during its Stapel migration (Ф3), and
-generalized so both flavors of the domain — *meetings* (legacy) and
-*bookings* (roadmap) — share one core.
+a prior backend during its Stapel migration (Ф3), and generalized so both
+flavors of the domain — *meetings* and *bookings* (roadmap) — share one
+core.
 
 ### Added
 - **Event / Participant / RSVP** models. `Event` is scope-agnostic (opaque
@@ -187,7 +187,7 @@ generalized so both flavors of the domain — *meetings* (legacy) and
   consumes schema in `schemas/consumes/`.
 - Removed dead `_WEEKDAY_OBJECTS` in `recurrence.py`.
 
-### Fixed (recurrence-correctness — vs the legacy source)
+### Fixed (recurrence-correctness — vs the prior source)
 - **Monthly recurrence** now uses `FREQ=MONTHLY` (calendar-correct: a series
   on the 31st yields Mar/May/… and skips short months) instead of the
   source's `timedelta(days=30)`, which drifted off the day-of-month.
