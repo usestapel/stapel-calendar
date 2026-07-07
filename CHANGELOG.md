@@ -4,7 +4,7 @@ All notable changes to stapel-calendar are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Pre-1.0 semver: **minor = breaking**, patch = compatible.
 
-## [0.2.1] — Unreleased
+## [0.2.2] - 2026-07-08
 
 ### Changed
 - Pinned `stapel-core` to the `>=0.8,<0.9` window (library-standard §7.1: one
