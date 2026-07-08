@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/usestapel/stapel-calendar/actions/workflows/ci.yml/badge.svg)](https://github.com/usestapel/stapel-calendar/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/usestapel/stapel-calendar/graph/badge.svg)](https://codecov.io/gh/usestapel/stapel-calendar)
+[![PyPI](https://img.shields.io/pypi/v/stapel-calendar.svg)](https://pypi.org/project/stapel-calendar/)
 
 Calendar, recurrence and scheduling for the [Stapel framework](https://github.com/usestapel) —
 composable Django apps that deploy as a monolith or as microservices
