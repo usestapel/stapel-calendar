@@ -164,6 +164,63 @@ TTL-junk machinery, nobody-edits-this-through-the-admin journals) or `secret`
 webhook secret, or external-sync dedup/audit-log model exists in this
 library to warrant otherwise.
 
+### Contract emission — the `schema` + `flows` + `errors` triad
+
+This module emits its **own** machine-readable API contract, per-module, so
+the frontend codegen (and any host migrating to `stapel-calendar`) reads a
+committed, version-pinned artifact instead of checking out a floating-`main`
+aggregate (contract-pipeline.md §2, verdict **A**). Copied from stapel-auth's
+reference implementation (contract-pipeline.md §2-3, ETALON) and
+stapel-profiles' adaptation. The triad lives in `docs/`:
+
+```
+docs/schema.json   drf-spectacular OpenAPI, this module only, canonical /calendar/api/ prefix
+docs/flows.json    generate_flow_docs machine artifact — [] (no @flow_step here)
+docs/errors.json   generate_error_keys registry (unchanged by this addition)
+```
+
+**stapel-calendar is not yet mounted in `stapel-example-monolith`**
+(grep-confirmed — no monolith `urls.py` references `stapel_calendar`), so
+unlike auth/profiles there is no aggregate slice to diff `docs/schema.json`
+against for byte-identity. Standalone validation substitutes
+(contract-pipeline.md §9 fallback):
+
+- **determinism** — two independent `make contract` runs are byte-identical;
+- **self-contained `$ref` closure** — every component reference reachable
+  from a path resolves inside this one document (zero dangling refs); no
+  sibling module needed to be co-mounted for closure;
+- **security** — every operation (all six calendar views require
+  `IsAuthenticated`) carries `security: [{"JWTCookieAuth": []}]`;
+- **canonical prefix** — schema paths and flow endpoints are mounted at
+  `/calendar/api/*`, matching the `<mod>/api/` shape every pair-backend uses,
+  derived from this module's own `urls.py` docstring
+  (`path("calendar/", include("stapel_calendar.urls"))`).
+
+`tests/test_contract.py` asserts all four; a dormant
+`test_matches_monolith_calendar_slice` (unconditionally skipped) is wired for
+the day calendar *is* mounted in the monolith, mirroring auth/profiles — do
+not fabricate a slice to make it pass early.
+
+**Harness** (`_codegen_settings.py` / `codegen_urls.py` / `_codegen.py`,
+`make contract` / `make contract-check`): same shape as stapel-auth's, with
+one addition specific to calendar (shared with profiles) —
+`_codegen.py` explicitly calls
+`stapel_core.django.openapi.swagger._register_jwt_auth_extension()` before
+emitting. A real host registers this drf-spectacular extension (the
+`JWTCookieAuth` security scheme) as a side effect of its own dev-only Swagger
+URLs; that registration is *global* process state, not tied to any one
+module's urls.py. stapel-auth's harness gets it for free only because its
+co-mounted sibling (`stapel_gdpr.urls`) happens to call
+`get_app_swagger_urls()` unconditionally — calendar has no such sibling (it
+mounts alone), so without the explicit call, protected endpoints would emit
+without their `security: [{"JWTCookieAuth": []}]` entry.
+
+Regenerate after any serializer/view/url/error change:
+
+    make contract        # or: python -m stapel_calendar._codegen --out docs
+
+then commit `docs/{schema,flows,errors}.json`.
+
 ## Anti-patterns
 
 - **Don't create app resources inside the recurrence engine.** Subscribe to

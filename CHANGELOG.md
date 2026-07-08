@@ -4,6 +4,57 @@ All notable changes to stapel-calendar are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Pre-1.0 semver: **minor = breaking**, patch = compatible.
 
+## [Unreleased]
+
+### Added — per-module contract emission: `schema` + `flows` + `errors` triad (contract-pipeline.md Wave 1)
+
+stapel-calendar now emits its **own** API contract per-module —
+`docs/{schema,flows,errors}.json` — so the frontend codegen (and client-project's
+migration to `stapel-calendar`, §17 W1) can read a committed,
+version-pinned artifact instead of checking out a floating-`main` aggregate
+(contract-pipeline.md verdict **A**: contract = a reviewable commit). Copied
+from stapel-auth's reference implementation (contract-pipeline.md §2-3,
+ETALON) and stapel-profiles' adaptation for a no-sibling-co-mount module.
+
+- **Harness** (reuses `stapel_tools.codegen`, adds per-module config):
+  - `_codegen_settings.py` — single source of truth for the
+    `settings.configure` block, shared with `conftest.py` (extracted, no
+    test-behavior change); adds `drf_spectacular` +
+    `stapel_core.django.apps.CommonDjangoConfig` to `INSTALLED_APPS`
+    (unconditionally — the management commands the errors gate needs) and a
+    `contract=True` mode that swaps in the production `REST_FRAMEWORK`.
+  - `codegen_urls.py` — mounts `stapel_calendar.urls` alone at the canonical
+    `calendar/api/` prefix (the module's own `urls.py` docstring already
+    documents this as the expected host mount), so emitted paths are
+    `/calendar/api/...` not bare `/api/events`.
+  - `_codegen.py` — the `python -m stapel_calendar._codegen --out docs`
+    entrypoint. Explicitly registers drf-spectacular's
+    `JWTCookieAuthenticationExtension`
+    (`stapel_core...swagger._register_jwt_auth_extension`) — calendar has no
+    co-mounted sibling to trigger this registration as a side effect (unlike
+    auth+gdpr), so without the explicit call every protected operation (all
+    six calendar views require `IsAuthenticated`) would silently emit with no
+    `security` entry at all.
+- **`docs/schema.json`** (new) — drf-spectacular OpenAPI for calendar only,
+  canonical `/calendar/api/` prefix, 6 paths, 8-component closure.
+  **`docs/flows.json`** (new) — empty array, calendar has no `@flow_step`
+  annotations. **`docs/errors.json`** (new) — 48 error keys (7
+  calendar-owned + the cross-cutting core registry).
+- **Validation:** stapel-calendar is **not yet mounted in
+  stapel-example-monolith** (grep-confirmed — no monolith `urls.py`
+  references `stapel_calendar`), so there is no aggregate slice to diff
+  byte-for-byte (contract-pipeline.md §9 fallback applies). Standalone gates
+  substitute: emission determinism (two independent runs byte-identical),
+  self-contained `$ref` closure (zero dangling component references — no
+  sibling-module dependency needed), every protected operation carries
+  `security: [{"JWTCookieAuth": []}]`, and all paths/flow-endpoints carry the
+  canonical `/calendar/api/` prefix. A dormant
+  `test_matches_monolith_calendar_slice` (unconditionally skipped) is wired
+  for the day calendar *is* mounted there, mirroring auth/profiles.
+- **Gate:** `make contract` / `make contract-check`; `tests/test_contract.py`
+  (drift + determinism + canonical-prefix + `$ref` closure + JWT-security,
+  the monolith-identity test dormant until calendar is mounted).
+
 ## [0.2.2] - 2026-07-08
 
 ### Changed

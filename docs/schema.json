@@ -1,0 +1,570 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "",
+    "version": "0.0.0"
+  },
+  "paths": {
+    "/calendar/api/availability": {
+      "get": {
+        "operationId": "calendar_api_availability_retrieve",
+        "description": "Free/busy + open booking slots for the requesting user over a range.\n\n**Permissions:** `IsAuthenticated`",
+        "tags": [
+          "Calendar"
+        ],
+        "security": [
+          {
+            "JWTCookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvailabilityResponse"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/calendar/api/calendar": {
+      "get": {
+        "operationId": "calendar_api_calendar_retrieve",
+        "description": "The requesting user's calendar over a range: concrete events plus the\nvirtual+materialized occurrences of every series they're on.\n\n**Permissions:** `IsAuthenticated`",
+        "tags": [
+          "Calendar"
+        ],
+        "security": [
+          {
+            "JWTCookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarResponse"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/calendar/api/events": {
+      "get": {
+        "operationId": "calendar_api_events_list",
+        "description": "List the requesting user's events in a range, or create an event.\n\n**Permissions:** `IsAuthenticated`",
+        "tags": [
+          "Calendar"
+        ],
+        "security": [
+          {
+            "JWTCookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EventResponse"
+                  }
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      },
+      "post": {
+        "operationId": "calendar_api_events_create",
+        "description": "List the requesting user's events in a range, or create an event.\n\n**Permissions:** `IsAuthenticated`",
+        "tags": [
+          "Calendar"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventCreateRequest"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/EventCreateRequest"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/EventCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "JWTCookieAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventResponse"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/calendar/api/events/{event_id}": {
+      "get": {
+        "operationId": "calendar_api_events_retrieve",
+        "description": "Retrieve/update/delete a single event (mutations owner-only).\n\n**Permissions:** `IsAuthenticated`",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true
+          }
+        ],
+        "tags": [
+          "Calendar"
+        ],
+        "security": [
+          {
+            "JWTCookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventResponse"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      },
+      "delete": {
+        "operationId": "calendar_api_events_destroy",
+        "description": "Retrieve/update/delete a single event (mutations owner-only).\n\n**Permissions:** `IsAuthenticated`",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true
+          }
+        ],
+        "tags": [
+          "Calendar"
+        ],
+        "security": [
+          {
+            "JWTCookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventResponse"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    },
+    "/calendar/api/events/{event_id}/ics": {
+      "get": {
+        "operationId": "calendar_api_events_ics_retrieve",
+        "description": "Export an event (series RRULE included) as an RFC 5545 .ics file.\n\n**Permissions:** `IsAuthenticated`",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true
+          }
+        ],
+        "tags": [
+          "Calendar"
+        ],
+        "security": [
+          {
+            "JWTCookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "No response body"
+          }
+        }
+      }
+    },
+    "/calendar/api/events/{event_id}/respond": {
+      "post": {
+        "operationId": "calendar_api_events_respond_create",
+        "description": "Record the requesting user's RSVP to an event.\n\n**Permissions:** `IsAuthenticated`",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true
+          }
+        ],
+        "tags": [
+          "Calendar"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RSVPRequest"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/RSVPRequest"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/RSVPRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "JWTCookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventResponse"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AvailabilityResponse": {
+        "type": "object",
+        "description": "Free/busy + open slots for a user.",
+        "properties": {
+          "busy": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IntervalResponse"
+            },
+            "description": "Coalesced busy intervals in the range"
+          },
+          "slots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IntervalResponse"
+            },
+            "description": "Open booking slots (empty if no availability windows set)"
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "True when a series expansion hit the"
+          }
+        }
+      },
+      "CalendarResponse": {
+        "type": "object",
+        "description": "A user's calendar over a range: concrete events + expanded occurrences.",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventResponse"
+            },
+            "description": "Concrete/standalone events overlapping the range"
+          },
+          "occurrences": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OccurrenceResponse"
+            },
+            "description": "Expanded (virtual + materialized) occurrences of series"
+          }
+        }
+      },
+      "EventCreateRequest": {
+        "type": "object",
+        "description": "Create an event.",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Event title"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Start (tz-aware ISO 8601)"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "description": "End (tz-aware ISO 8601)"
+          },
+          "description": {
+            "type": "string",
+            "description": "Optional description"
+          },
+          "recurrence_type": {
+            "type": "string",
+            "description": "none/daily/weekdays/weekly/biweekly/monthly/custom"
+          },
+          "recurrence_interval": {
+            "type": "integer",
+            "nullable": true,
+            "description": "RRULE INTERVAL (>=1)"
+          },
+          "recurrence_weekdays": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "Weekday ints (0=Mon..6=Sun) for custom"
+          },
+          "recurrence_until": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Series end (tz-aware ISO 8601), maps to RRULE UNTIL"
+          },
+          "recurrence_count": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Number of occurrences, maps to RRULE COUNT"
+          },
+          "participant_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "User ids to invite"
+          }
+        },
+        "required": [
+          "end",
+          "start",
+          "title"
+        ]
+      },
+      "EventResponse": {
+        "type": "object",
+        "description": "A calendar event (series master or concrete occurrence).",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Event id (UUID)"
+          },
+          "title": {
+            "type": "string",
+            "description": "Event title"
+          },
+          "description": {
+            "type": "string",
+            "description": "Free-text description"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Start (tz-aware ISO 8601)"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "description": "End (tz-aware ISO 8601)"
+          },
+          "owner_id": {
+            "type": "string",
+            "description": "Creator's user id"
+          },
+          "scope_key": {
+            "type": "string",
+            "description": "Opaque host scope (workspace/org/tenant)"
+          },
+          "status": {
+            "type": "string",
+            "description": "confirmed/tentative/cancelled"
+          },
+          "recurrence_type": {
+            "type": "string",
+            "description": "Human preset used to build the RRULE"
+          },
+          "rrule": {
+            "type": "string",
+            "description": "Canonical RFC 5545 RRULE line (empty for non-recurring)"
+          },
+          "recurrence_parent_id": {
+            "type": "string",
+            "nullable": true,
+            "description": "Series master id if this is a materialized occurrence"
+          },
+          "participants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParticipantResponse"
+            },
+            "description": "Invitees with RSVPs"
+          }
+        },
+        "required": [
+          "description",
+          "end",
+          "id",
+          "owner_id",
+          "recurrence_type",
+          "rrule",
+          "scope_key",
+          "start",
+          "status",
+          "title"
+        ]
+      },
+      "IntervalResponse": {
+        "type": "object",
+        "description": "A time interval.",
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Interval start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Interval end"
+          }
+        },
+        "required": [
+          "end",
+          "start"
+        ]
+      },
+      "OccurrenceResponse": {
+        "type": "object",
+        "description": "A single (possibly virtual) instance of a recurring event.",
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "description": "The series master id"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Occurrence start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Occurrence end"
+          },
+          "is_materialized": {
+            "type": "boolean",
+            "description": "True if a concrete row exists for this instant"
+          },
+          "materialized_id": {
+            "type": "string",
+            "nullable": true,
+            "description": "The concrete occurrence id, if materialized"
+          }
+        },
+        "required": [
+          "end",
+          "event_id",
+          "is_materialized",
+          "start"
+        ]
+      },
+      "ParticipantResponse": {
+        "type": "object",
+        "description": "An invitee and their RSVP.",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "description": "The participant's user id"
+          },
+          "rsvp": {
+            "type": "string",
+            "description": "One of invited/accepted/tentative/declined"
+          }
+        },
+        "required": [
+          "rsvp",
+          "user_id"
+        ]
+      },
+      "RSVPRequest": {
+        "type": "object",
+        "description": "Respond to an event invitation.",
+        "properties": {
+          "rsvp": {
+            "type": "string",
+            "description": "One of accepted/tentative/declined"
+          }
+        },
+        "required": [
+          "rsvp"
+        ]
+      }
+    },
+    "securitySchemes": {
+      "JWTCookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "stapel_jwt",
+        "description": "JWT token stored in cookie. Login via /auth/admin/ to get the cookie."
+      }
+    }
+  }
+}
