@@ -6,6 +6,40 @@ Pre-1.0 semver: **minor = breaking**, patch = compatible.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-09
+
+### Added — event update surface, post-create participant management, visibility axis
+
+Three additive surfaces (contract grows: 8 → 10 operations, first CTO-facing
+config axis). Pre-1.0 minor bump.
+
+- **`PATCH /calendar/api/events/{id}`** — partial update of an event
+  (owner-only; 403 for a non-owner, 404 out of scope). Only the fields present
+  in the body change. Editing any recurrence input (or `start`, the series
+  anchor) of a **series master** rebuilds its canonical RRULE symmetrically to
+  create — send the complete recurrence spec (the library stores only the
+  RRULE, not its inputs, so recurrence params are re-specified, not merged).
+  **Rebuild reconciles materialized occurrence exceptions** against the new
+  rule by their `recurrence_id`: a child on a still-valid instant is kept
+  untouched; an orphaned CANCELLED tombstone is deleted (an EXDATE for a
+  vanished instant is meaningless); an orphaned child that carries real state
+  (a reschedule, RSVPs, an attached resource) is detached into a standalone
+  event — a rule edit never silently destroys user/app data.
+- **`PUT /calendar/api/events/{id}/participants`** — replace-set management of
+  the invitee list (owner/organizer-only; 403/404 as above). The resulting set
+  is `{owner} ∪ participant_ids`: the owner is always retained as accepted,
+  ids that persist keep their existing RSVP, new ids are added as invited,
+  absent ids are removed.
+- **`VISIBILITY` config axis** (participants | scope; capability-config.md §16)
+  — the module's first CTO-facing axis, surfaced in `docs/capabilities.json`.
+  `participants` (default, fail-closed) keeps the historical private-calendar
+  read model; `scope` makes events visible to the whole scope the
+  `SCOPE_PROVIDER` resolves (workspace/org/tenant-wide calendars). An unknown
+  value degrades to `participants` rather than widening visibility. Behavioral,
+  not gating — it changes what the listing/calendar/detail endpoints return,
+  not which endpoints exist.
+- Contract artifacts (`docs/{schema,capabilities}.json`) regenerated.
+
 ## [0.2.3] - 2026-07-09
 
 ### Added — `docs/capabilities.json`, the fourth contract artifact (A6 sweep)

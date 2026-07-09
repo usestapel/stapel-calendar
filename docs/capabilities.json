@@ -1,8 +1,24 @@
 {
   "module": "stapel-calendar",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "provides": "Calendar and scheduling: events with participants and RSVP, RFC 5545 recurring series (virtual expansion, on-demand materialization, per-instant cancellation and reschedule), availability windows with free/busy and bookable slot computation, ICS export, and event-driven reminders.",
-  "axes": [],
+  "axes": [
+    {
+      "key": "VISIBILITY",
+      "kind": "enum",
+      "default": "participants",
+      "group": "calendar.visibility",
+      "gates": {
+        "operations": [],
+        "co_gates": [],
+        "behavior": "participants: event read access is limited to its invitees; scope: events are visible to the whole resolved scope (workspace/org/tenant)."
+      },
+      "curated": {
+        "summary": "Controls the read surface of every event. \"participants\" (default) shows an event only to the people invited to it — the private-calendar model. \"scope\" makes events visible to everyone in the same workspace/org/tenant (as resolved by the scope provider) — a shared team calendar. Values: participants, scope. It changes what listing, calendar and detail endpoints return, not which endpoints exist.",
+        "business_label": "Who can see an event"
+      }
+    }
+  ],
   "extension_points": [
     {
       "name": "REMINDER_POLICY",
@@ -30,7 +46,7 @@
       "summary": "Every view declares request/response serializer seams (SerializerSeamMixin) — subclass the view, override the attribute, remount the URL."
     }
   ],
-  "operations_total": 8,
+  "operations_total": 10,
   "requires": [
     {
       "module": "stapel-core",

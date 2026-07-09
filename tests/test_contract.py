@@ -69,11 +69,11 @@ if _PY != (3, 12):
 REPO = Path(__file__).resolve().parent.parent
 DOCS = REPO / "docs"
 TRIAD = ("schema.json", "flows.json", "errors.json")
-# The fourth artifact (capability-config.md §2): calendar's settings are all
-# tuning knobs or extension seams, so the manifest carries axes: [] —
-# provides/requires/extension_points still feed the capability catalog.
-# Emitted from conf.py DEFAULTS + the urls.py gate registry + schema.json +
-# the curated docs/capabilities.meta.json. Same emit/drift discipline.
+# The fourth artifact (capability-config.md §2): calendar exposes one
+# CTO-facing config axis — VISIBILITY (participants|scope, §16); its other
+# settings are tuning knobs or extension seams. Emitted from conf.py DEFAULTS +
+# the urls.py gate registry + schema.json + the curated
+# docs/capabilities.meta.json. Same emit/drift discipline.
 ARTIFACTS = TRIAD + ("capabilities.json",)
 
 
@@ -264,9 +264,21 @@ def _capabilities() -> dict:
     return json.loads((DOCS / "capabilities.json").read_text())
 
 
-def test_capabilities_axes_empty_by_design():
-    """All STAPEL_CALENDAR keys are tuning or extension seams → axes: []."""
-    assert _capabilities()["axes"] == []
+def test_capabilities_visibility_axis():
+    """VISIBILITY is the one CTO-facing axis (participants|scope, §16)."""
+    axes = {a["key"]: a for a in _capabilities()["axes"]}
+    assert set(axes) == {"VISIBILITY"}, (
+        "expected exactly the VISIBILITY axis — every other STAPEL_CALENDAR key "
+        "is a tuning knob or an extension seam"
+    )
+    axis = axes["VISIBILITY"]
+    assert axis["kind"] == "enum"
+    assert axis["default"] == "participants"
+    assert axis["group"] == "calendar.visibility"
+    # Behavioral, not gating: it changes what endpoints return, not which exist.
+    assert axis["gates"]["operations"] == []
+    assert axis["gates"]["behavior"]
+    assert axis["curated"]["business_label"]
 
 
 def test_capabilities_extension_points_cover_the_seams():

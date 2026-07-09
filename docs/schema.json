@@ -166,6 +166,60 @@
           }
         }
       },
+      "patch": {
+        "operationId": "calendar_api_events_partial_update",
+        "description": "Retrieve/update/delete a single event (mutations owner-only).\n\n**Permissions:** `IsAuthenticated`",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true
+          }
+        ],
+        "tags": [
+          "Calendar"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedEventUpdateRequest"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedEventUpdateRequest"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedEventUpdateRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWTCookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventResponse"
+                }
+              }
+            },
+            "description": ""
+          }
+        }
+      },
       "delete": {
         "operationId": "calendar_api_events_destroy",
         "description": "Retrieve/update/delete a single event (mutations owner-only).\n\n**Permissions:** `IsAuthenticated`",
@@ -228,6 +282,62 @@
         "responses": {
           "200": {
             "description": "No response body"
+          }
+        }
+      }
+    },
+    "/calendar/api/events/{event_id}/participants": {
+      "put": {
+        "operationId": "calendar_api_events_participants_update",
+        "description": "Replace an event's participant set (replace-set semantics, owner-only).\n\n**Permissions:** `IsAuthenticated`",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true
+          }
+        ],
+        "tags": [
+          "Calendar"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParticipantsReplaceRequest"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/ParticipantsReplaceRequest"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/ParticipantsReplaceRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWTCookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventResponse"
+                }
+              }
+            },
+            "description": ""
           }
         }
       }
@@ -543,6 +653,80 @@
           "rsvp",
           "user_id"
         ]
+      },
+      "ParticipantsReplaceRequest": {
+        "type": "object",
+        "description": "Replace an event's participant set (PUT).",
+        "properties": {
+          "participant_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The complete desired invitee list. The owner is always"
+          }
+        }
+      },
+      "PatchedEventUpdateRequest": {
+        "type": "object",
+        "description": "Partially update an event (PATCH). Every field is optional — only the\nfields present in the request body are changed.\n\nEditing any recurrence field (or ``start``, the series anchor) of a series\nmaster re-specifies and rebuilds the whole rule — send the COMPLETE\nrecurrence spec, exactly as for create (the library stores only the\ncanonical RRULE, not its constituent inputs, so recurrence params cannot be\nmerged individually).",
+        "properties": {
+          "title": {
+            "type": "string",
+            "nullable": true,
+            "description": "New title"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "description": "New description"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "New start (tz-aware ISO 8601)"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "New end (tz-aware ISO 8601)"
+          },
+          "status": {
+            "type": "string",
+            "nullable": true,
+            "description": "confirmed/tentative/cancelled"
+          },
+          "recurrence_type": {
+            "type": "string",
+            "nullable": true,
+            "description": "none/daily/weekdays/weekly/biweekly/monthly/custom"
+          },
+          "recurrence_interval": {
+            "type": "integer",
+            "nullable": true,
+            "description": "RRULE INTERVAL (>=1)"
+          },
+          "recurrence_weekdays": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "Weekday ints (0=Mon..6=Sun) for custom"
+          },
+          "recurrence_until": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Series end (tz-aware ISO 8601), maps to RRULE UNTIL"
+          },
+          "recurrence_count": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Number of occurrences, maps to RRULE COUNT"
+          }
+        }
       },
       "RSVPRequest": {
         "type": "object",
