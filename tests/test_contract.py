@@ -72,26 +72,37 @@ if _PY != (3, 12):
 REPO = Path(__file__).resolve().parent.parent
 DOCS = REPO / "docs"
 TRIAD = ("schema.json", "flows.json", "errors.json")
+# The fourth artifact (capability-config.md §2): calendar's settings are all
+# tuning knobs or extension seams, so the manifest carries axes: [] —
+# provides/requires/extension_points still feed the capability catalog.
+# Emitted from conf.py DEFAULTS + the urls.py gate registry + schema.json +
+# the curated docs/capabilities.meta.json. Same emit/drift discipline.
+ARTIFACTS = TRIAD + ("capabilities.json",)
 
 
 def _emit(out_dir: Path) -> None:
-    subprocess.run(
-        [sys.executable, "-m", "stapel_calendar._codegen", "--out", str(out_dir)],
-        cwd=str(REPO),
-        check=True,
-        capture_output=True,
+    for module in ("stapel_calendar._codegen", "stapel_calendar._capabilities"):
+        subprocess.run(
+            [sys.executable, "-m", module, "--out", str(out_dir)],
+            cwd=str(REPO),
+            check=True,
+            capture_output=True,
+        )
+
+
+def test_contract_artifacts_committed():
+    for name in ARTIFACTS:
+        assert (DOCS / name).is_file(), f"missing docs/{name} — run `make contract`"
+    assert (DOCS / "capabilities.meta.json").is_file(), (
+        "missing docs/capabilities.meta.json — the curated layer is "
+        "hand-written and committed, not generated"
     )
 
 
-def test_contract_triad_committed():
-    for name in TRIAD:
-        assert (DOCS / name).is_file(), f"missing docs/{name} — run `make contract`"
-
-
 def test_contract_has_no_drift(tmp_path):
-    """Regenerate into a temp dir; committed triad must match byte-for-byte."""
+    """Regenerate into a temp dir; committed artifacts must match byte-for-byte."""
     _emit(tmp_path)
-    for name in TRIAD:
+    for name in ARTIFACTS:
         committed = (DOCS / name).read_bytes()
         regenerated = (tmp_path / name).read_bytes()
         assert committed == regenerated, (
@@ -104,7 +115,7 @@ def test_emission_is_deterministic(tmp_path):
     a, b = tmp_path / "a", tmp_path / "b"
     _emit(a)
     _emit(b)
-    for name in TRIAD:
+    for name in ARTIFACTS:
         assert (a / name).read_bytes() == (b / name).read_bytes()
 
 
@@ -247,3 +258,68 @@ def test_matches_monolith_calendar_slice():
         assert json.dumps(mine["components"]["schemas"][c], sort_keys=True) == json.dumps(
             mono["components"]["schemas"][c], sort_keys=True
         ), f"component {c} differs from monolith slice"
+
+
+# --- capabilities.json content sanity (capability-config.md §2) ---------------
+
+
+def _capabilities() -> dict:
+    return json.loads((DOCS / "capabilities.json").read_text())
+
+
+def test_capabilities_axes_empty_by_design():
+    """All STAPEL_CALENDAR keys are tuning or extension seams → axes: []."""
+    assert _capabilities()["axes"] == []
+
+
+def test_capabilities_extension_points_cover_the_seams():
+    """The three settings-level seams (MODULE.md) surface as extension points."""
+    names = {e["name"] for e in _capabilities()["extension_points"]}
+    assert {"REMINDER_POLICY", "SCOPE_PROVIDER", "PRESETS"} <= names
+
+
+def test_capabilities_operations_total_matches_schema():
+    schema = json.loads((DOCS / "schema.json").read_text())
+    methods = {"get", "put", "post", "delete", "options", "head", "patch", "trace"}
+    total = sum(
+        1 for item in schema["paths"].values() for m in item if m in methods
+    )
+    assert _capabilities()["operations_total"] == total
+
+
+def test_capabilities_envelope():
+    doc = _capabilities()
+    import tomllib
+
+    pyproject = tomllib.loads((REPO / "pyproject.toml").read_text())
+    assert doc["module"] == pyproject["project"]["name"]
+    assert doc["version"] == pyproject["project"]["version"]
+    assert doc["provides"]
+    assert doc["extension_points"]
+    assert doc["requires"]
+
+
+def test_capabilities_stale_meta_axis_fails_loudly():
+    """A curated axis entry for a module with no axes must be an emission ERROR."""
+    from stapel_tools.capabilities import build_capabilities
+
+    from stapel_calendar.conf import DEFAULTS
+    from stapel_calendar.urls import GATE_REGISTRY
+
+    schema = json.loads((DOCS / "schema.json").read_text())
+    meta = json.loads((DOCS / "capabilities.meta.json").read_text())
+    broken = json.loads(json.dumps(meta))
+    broken["axes"]["CALENDAR_NO_SUCH_AXIS"] = {"summary": "x", "business_label": "x"}
+
+    with pytest.raises(SystemExit, match="CALENDAR_NO_SUCH_AXIS"):
+        build_capabilities(
+            module="stapel-calendar",
+            version="0.0.0",
+            defaults=DEFAULTS,
+            registry=GATE_REGISTRY,
+            schema=schema,
+            meta=broken,
+            is_axis=lambda k: False,
+            axis_group=lambda k: "unreachable",
+            canonical_prefix="/calendar",
+        )

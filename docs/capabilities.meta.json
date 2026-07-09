@@ -1,0 +1,49 @@
+{
+  "_comment": "Hand-curated layer of docs/capabilities.json (capability-config.md §2 p.3). The emitter (stapel_calendar/_capabilities.py) merges this over the derived axes; calendar's settings are all tuning knobs or extension seams, so axes is empty by design — provides/requires/extension_points still feed the capability catalog. Keep language business-facing — it surfaces in CTO conversations, not in code.",
+  "provides": "Calendar and scheduling: events with participants and RSVP, RFC 5545 recurring series (virtual expansion, on-demand materialization, per-instant cancellation and reschedule), availability windows with free/busy and bookable slot computation, ICS export, and event-driven reminders.",
+  "requires": [
+    {
+      "module": "stapel-core",
+      "optional": false,
+      "reason": "comm bus (occurrence.materialized / reminder_due emits, calendar.free_busy Function), JWT authentication, AppSettings config layer"
+    },
+    {
+      "module": "stapel-auth",
+      "optional": true,
+      "reason": "every endpoint requires an authenticated user (IsAuthenticated); stapel-auth is the shelf's session issuer — any stapel-core-compatible JWT issuer satisfies the check"
+    },
+    {
+      "module": "stapel-notifications",
+      "optional": true,
+      "reason": "delivers the calendar.event.reminder_due events the default reminder policy emits; reminders degrade to no-ops without a subscriber"
+    }
+  ],
+  "extension_points": [
+    {
+      "name": "REMINDER_POLICY",
+      "kind": "dotted_path",
+      "summary": "Swap the reminder policy (when and what to remind) — the default emits one reminder_due event per configured offset; subclass to change cadence or channel decisions without forking."
+    },
+    {
+      "name": "SCOPE_PROVIDER",
+      "kind": "dotted_path",
+      "summary": "Swap how the opaque scope_key (workspace/org/tenant) is resolved from the request and enforced on querysets — the default is a single global scope; a host may return the active workspace_id."
+    },
+    {
+      "name": "PRESETS",
+      "kind": "merge_registry",
+      "summary": "Add or override recurrence presets (dateutil rrule kwargs) merged over the built-ins (none/daily/weekdays/weekly/biweekly/monthly/custom); None removes a built-in."
+    },
+    {
+      "name": "calendar.occurrence.materialized",
+      "kind": "comm_event",
+      "summary": "The resource hook: when a recurring occurrence is materialized the engine emits this event (plus a Django signal) — the app layer subscribes to attach its resource (e.g. a video room) without any coupling in the engine."
+    },
+    {
+      "name": "serializer_seams",
+      "kind": "class_override",
+      "summary": "Every view declares request/response serializer seams (SerializerSeamMixin) — subclass the view, override the attribute, remount the URL."
+    }
+  ],
+  "axes": {}
+}

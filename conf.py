@@ -23,9 +23,10 @@ The four documented extension seams (see MODULE.md):
 """
 from stapel_core.conf import AppSettings
 
-calendar_settings = AppSettings(
-    "STAPEL_CALENDAR",
-    defaults={
+#: AppSettings-shaped literal dict (capability-config.md §2): a top-level
+#: DEFAULTS lets the capabilities.json emitter introspect axis keys/kinds
+#: without re-parsing the AppSettings() call.
+DEFAULTS = {
         # Cap for virtual expansion of an unbounded series (no UNTIL/COUNT
         # in the RRULE and no explicit range end): how many days ahead of
         # the range start to expand for display.
@@ -53,7 +54,11 @@ calendar_settings = AppSettings(
         "PRESETS": {},
         # Default slot length (minutes) for availability slot computation.
         "DEFAULT_SLOT_MINUTES": 30,
-    },
+}
+
+calendar_settings = AppSettings(
+    "STAPEL_CALENDAR",
+    defaults=DEFAULTS,
     import_strings=("REMINDER_POLICY", "SCOPE_PROVIDER"),
 )
 
