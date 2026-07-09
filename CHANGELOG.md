@@ -53,8 +53,8 @@ byte-stable across contributor machines).
 ### Added — per-module contract emission: `schema` + `flows` + `errors` triad (contract-pipeline.md Wave 1)
 
 stapel-calendar now emits its **own** API contract per-module —
-`docs/{schema,flows,errors}.json` — so the frontend codegen (and client-project's
-migration to `stapel-calendar`, §17 W1) can read a committed,
+`docs/{schema,flows,errors}.json` — so the frontend codegen (and client
+migrations to `stapel-calendar`, §17 W1) can read a committed,
 version-pinned artifact instead of checking out a floating-`main` aggregate
 (contract-pipeline.md verdict **A**: contract = a reviewable commit). Copied
 from stapel-auth's reference implementation (contract-pipeline.md §2-3,
