@@ -109,6 +109,12 @@ setting -> environment variable -> default. Read lazily at call time.
 | `DEFAULT_EXPANSION_HORIZON_DAYS` | `90` | Default range end when none given | value |
 | `MAX_EXPANSION_OCCURRENCES` | `1000` | Safety cap on one expansion | value |
 | `DEFAULT_SLOT_MINUTES` | `30` | Default slot length | value |
+| `VISIBILITY` | `participants` | Event read surface: `participants` (invitees only) or `scope` (whole resolved scope) | **axis** (participants\|scope; capability-config.md §16) |
+
+`VISIBILITY` is the module's one CTO-facing config axis (surfaced in
+`docs/capabilities.json`): `participants` (default, fail-closed) limits an
+event to its invitees; `scope` opens events to the whole scope the
+`SCOPE_PROVIDER` resolves. An unknown value degrades to `participants`.
 
 ### Serializer seams (`views.py`)
 

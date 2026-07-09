@@ -41,6 +41,8 @@ from .serializers import (
     CalendarResponseSerializer,
     EventCreateRequestSerializer,
     EventResponseSerializer,
+    EventUpdateRequestSerializer,
+    ParticipantsReplaceRequestSerializer,
     RSVPRequestSerializer,
 )
 
@@ -120,6 +122,27 @@ def _parse_range(request):
     return start, end
 
 
+def _visible_events(request):
+    """Base queryset of events the request may read, honoring the VISIBILITY
+    axis (capability-config.md §16) and then the SCOPE_PROVIDER seam.
+
+    - ``participants`` (default, fail-closed): only events the request user is
+      a participant of — the historical behavior.
+    - ``scope``: every event in the scope the provider resolves for the request
+      (workspace/org/tenant-wide calendars). Any value other than ``scope``
+      falls back to ``participants`` so a typo never widens visibility.
+
+    The scope provider is applied in BOTH modes: it is what actually bounds
+    ``scope`` visibility to the caller's workspace (with the default no-op
+    provider, ``scope`` is a single global calendar — pair it with a real
+    provider for per-workspace visibility).
+    """
+    qs = Event.objects.all()
+    if calendar_settings.VISIBILITY != "scope":
+        qs = qs.filter(participants__user=request.user)
+    return get_scope_provider().filter(qs, request)
+
+
 # ── Views ────────────────────────────────────────────────────────────────
 
 
@@ -138,15 +161,11 @@ class EventListCreateView(SerializerSeamMixin, APIView):
         except ValueError:
             return StapelErrorResponse(400, ERR_400_INVALID_RANGE)
         qs = (
-            Event.objects.filter(
-                participants__user=request.user,
-                start__lte=end,
-                end__gte=start,
-            )
+            _visible_events(request)
+            .filter(start__lte=end, end__gte=start)
             .distinct()
             .prefetch_related("participants")
         )
-        qs = get_scope_provider().filter(qs, request)
         response_cls = self.get_response_serializer_class()
         return StapelResponse(
             response_cls([event_to_dto(e) for e in qs], many=True)
@@ -191,7 +210,22 @@ class EventDetailView(SerializerSeamMixin, APIView):
     """Retrieve/update/delete a single event (mutations owner-only)."""
 
     permission_classes = [permissions.IsAuthenticated]
+    request_serializer_class = EventUpdateRequestSerializer
     response_serializer_class = EventResponseSerializer
+
+    #: Request-body fields the PATCH surface forwards to services.update_event.
+    _UPDATABLE_FIELDS = (
+        "title",
+        "description",
+        "start",
+        "end",
+        "status",
+        "recurrence_type",
+        "recurrence_interval",
+        "recurrence_weekdays",
+        "recurrence_until",
+        "recurrence_count",
+    )
 
     def _get(self, request, event_id):
         qs = get_scope_provider().filter(Event.objects.all(), request)
@@ -202,6 +236,41 @@ class EventDetailView(SerializerSeamMixin, APIView):
         event = self._get(request, event_id)
         if event is None:
             return StapelErrorResponse(404, ERR_404_EVENT_NOT_FOUND)
+        response_cls = self.get_response_serializer_class()
+        return StapelResponse(response_cls(event_to_dto(event)))
+
+    @extend_schema(
+        request=EventUpdateRequestSerializer,
+        responses={200: EventResponseSerializer},
+    )
+    def patch(self, request, event_id):
+        event = self._get(request, event_id)
+        if event is None:
+            return StapelErrorResponse(404, ERR_404_EVENT_NOT_FOUND)
+        if event.owner_id != request.user.id:
+            return StapelErrorResponse(403, ERR_403_NOT_EVENT_OWNER)
+        ser = self.get_request_serializer_class()(data=request.data, partial=True)
+        ser.is_valid(raise_exception=True)
+        data = ser.validated_data
+        # True PATCH: only the fields the client actually sent become changes.
+        # (The dataclass DTO gives every field a default, which the serializer
+        # turns into a field default — so an absent field validates to its
+        # default rather than a sentinel; presence is read from the raw body.)
+        present = set(request.data.keys())
+        changes = {
+            name: getattr(data, name)
+            for name in self._UPDATABLE_FIELDS
+            if name in present
+        }
+        try:
+            event = services.update_event(event, changes)
+        except InvalidRecurrence:
+            return StapelErrorResponse(400, ERR_400_INVALID_RECURRENCE)
+        except ValueError:
+            return StapelErrorResponse(400, ERR_400_INVALID_RANGE)
+        event = (
+            Event.objects.prefetch_related("participants").filter(id=event.id).first()
+        )
         response_cls = self.get_response_serializer_class()
         return StapelResponse(response_cls(event_to_dto(event)))
 
@@ -252,6 +321,40 @@ class EventRespondView(SerializerSeamMixin, APIView):
 
 
 @extend_schema(tags=["Calendar"])
+class EventParticipantsView(SerializerSeamMixin, APIView):
+    """Replace an event's participant set (replace-set semantics, owner-only)."""
+
+    permission_classes = [permissions.IsAuthenticated]
+    request_serializer_class = ParticipantsReplaceRequestSerializer
+    response_serializer_class = EventResponseSerializer
+
+    def _get(self, request, event_id):
+        qs = get_scope_provider().filter(Event.objects.all(), request)
+        return qs.prefetch_related("participants").filter(id=event_id).first()
+
+    @extend_schema(
+        request=ParticipantsReplaceRequestSerializer,
+        responses={200: EventResponseSerializer},
+    )
+    def put(self, request, event_id):
+        event = self._get(request, event_id)
+        if event is None:
+            return StapelErrorResponse(404, ERR_404_EVENT_NOT_FOUND)
+        # Managing the invitee list is an organizer action — in this engine the
+        # organizer is the event owner (there is no separate organizer role).
+        if event.owner_id != request.user.id:
+            return StapelErrorResponse(403, ERR_403_NOT_EVENT_OWNER)
+        ser = self.get_request_serializer_class()(data=request.data)
+        ser.is_valid(raise_exception=True)
+        services.replace_participants(event, ser.validated_data.participant_ids)
+        event = (
+            Event.objects.prefetch_related("participants").filter(id=event.id).first()
+        )
+        response_cls = self.get_response_serializer_class()
+        return StapelResponse(response_cls(event_to_dto(event)))
+
+
+@extend_schema(tags=["Calendar"])
 class EventICSView(SerializerSeamMixin, APIView):
     """Export an event (series RRULE included) as an RFC 5545 .ics file."""
 
@@ -283,9 +386,7 @@ class CalendarView(SerializerSeamMixin, APIView):
         except ValueError:
             return StapelErrorResponse(400, ERR_400_INVALID_RANGE)
 
-        base = get_scope_provider().filter(
-            Event.objects.filter(participants__user=request.user).distinct(), request
-        )
+        base = _visible_events(request).distinct()
         concrete = base.filter(rrule="", start__lte=end, end__gte=start).prefetch_related(
             "participants"
         )

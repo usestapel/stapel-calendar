@@ -10,9 +10,11 @@ from .dto import (
     CalendarResponse,
     EventCreateRequest,
     EventResponse,
+    EventUpdateRequest,
     IntervalResponse,
     OccurrenceResponse,
     ParticipantResponse,
+    ParticipantsReplaceRequest,
     RSVPRequest,
 )
 
@@ -55,3 +57,13 @@ class EventCreateRequestSerializer(StapelDataclassSerializer):
 class RSVPRequestSerializer(StapelDataclassSerializer):
     class Meta:
         dataclass = RSVPRequest
+
+
+class EventUpdateRequestSerializer(StapelDataclassSerializer):
+    class Meta:
+        dataclass = EventUpdateRequest
+
+
+class ParticipantsReplaceRequestSerializer(StapelDataclassSerializer):
+    class Meta:
+        dataclass = ParticipantsReplaceRequest

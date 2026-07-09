@@ -12,6 +12,7 @@ from .views import (
     EventDetailView,
     EventICSView,
     EventListCreateView,
+    EventParticipantsView,
     EventRespondView,
 )
 
@@ -21,6 +22,11 @@ urlpatterns = [
         "api/events/<uuid:event_id>",
         EventDetailView.as_view(),
         name="calendar-event-detail",
+    ),
+    path(
+        "api/events/<uuid:event_id>/participants",
+        EventParticipantsView.as_view(),
+        name="calendar-event-participants",
     ),
     path(
         "api/events/<uuid:event_id>/respond",

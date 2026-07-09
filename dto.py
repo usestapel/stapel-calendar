@@ -153,3 +153,53 @@ class RSVPRequest:
     """
 
     rsvp: str
+
+
+@dataclass
+class EventUpdateRequest:
+    """Partially update an event (PATCH). Every field is optional — only the
+    fields present in the request body are changed.
+
+    Editing any recurrence field (or ``start``, the series anchor) of a series
+    master re-specifies and rebuilds the whole rule — send the COMPLETE
+    recurrence spec, exactly as for create (the library stores only the
+    canonical RRULE, not its constituent inputs, so recurrence params cannot be
+    merged individually).
+
+    Attributes:
+        title: New title.
+        description: New description.
+        start: New start (tz-aware ISO 8601).
+        end: New end (tz-aware ISO 8601).
+        status: confirmed/tentative/cancelled.
+        recurrence_type: none/daily/weekdays/weekly/biweekly/monthly/custom.
+        recurrence_interval: RRULE INTERVAL (>=1).
+        recurrence_weekdays: Weekday ints (0=Mon..6=Sun) for custom.
+        recurrence_until: Series end (tz-aware ISO 8601), maps to RRULE UNTIL.
+        recurrence_count: Number of occurrences, maps to RRULE COUNT.
+    """
+
+    title: Optional[str] = None
+    description: Optional[str] = None
+    start: Optional[datetime] = None
+    end: Optional[datetime] = None
+    status: Optional[str] = None
+    recurrence_type: Optional[str] = None
+    recurrence_interval: Optional[int] = None
+    recurrence_weekdays: List[int] = field(default_factory=list)
+    recurrence_until: Optional[datetime] = None
+    recurrence_count: Optional[int] = None
+
+
+@dataclass
+class ParticipantsReplaceRequest:
+    """Replace an event's participant set (PUT).
+
+    Attributes:
+        participant_ids: The complete desired invitee list. The owner is always
+            retained (as accepted) whether or not present; ids already on the
+            event keep their RSVP; new ids are added as invited; absent ids are
+            removed.
+    """
+
+    participant_ids: List[str] = field(default_factory=list)

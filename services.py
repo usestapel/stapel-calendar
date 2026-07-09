@@ -103,6 +103,155 @@ def respond(event: Event, user, rsvp: str) -> Participant:
     return participant
 
 
+def replace_participants(event: Event, participant_ids) -> Event:
+    """Replace ``event``'s participant set — the PUT replace-set semantics.
+
+    The resulting set is exactly ``{owner} ∪ participant_ids``: the owner is
+    always retained as ``ACCEPTED`` (an event cannot exist without its owner,
+    so passing a list that omits the owner does not remove them); ids already
+    on the event **keep their existing RSVP** (a re-sent list must not silently
+    reset an accepted invite back to invited); brand-new ids are added as
+    ``INVITED``; ids no longer in the list are removed. Idempotent.
+    """
+    owner_id = str(event.owner_id)
+    desired = {owner_id} | {str(uid) for uid in (participant_ids or [])}
+    existing = {str(p.user_id): p for p in event.participants.all()}
+
+    stale_ids = [p.id for uid, p in existing.items() if uid not in desired]
+    if stale_ids:
+        Participant.objects.filter(id__in=stale_ids).delete()
+
+    new_rows = [
+        Participant(
+            event=event,
+            user_id=uid,
+            rsvp=RSVP.ACCEPTED if uid == owner_id else RSVP.INVITED,
+        )
+        for uid in desired
+        if uid not in existing
+    ]
+    if new_rows:
+        Participant.objects.bulk_create(new_rows, ignore_conflicts=True)
+    return event
+
+
+#: Fields whose change on a series master re-derives its RRULE and forces a
+#: series rebuild (``start`` is the DTSTART anchor — moving it shifts every
+#: rule instant). See :func:`update_event`.
+_RRULE_INPUT_FIELDS = frozenset(
+    {
+        "recurrence_type",
+        "recurrence_interval",
+        "recurrence_weekdays",
+        "recurrence_until",
+        "recurrence_count",
+    }
+)
+
+_SIMPLE_FIELDS = ("title", "description", "start", "end", "status")
+
+
+def update_event(event: Event, changes: dict) -> Event:
+    """Partially update ``event`` (the PATCH surface) and, for a series master
+    whose rule changed, rebuild the series.
+
+    ``changes`` carries only the fields the client actually sent (partial
+    semantics). Plain fields (``title``/``description``/``start``/``end``/
+    ``status``) are assigned as given. ``end < start`` (whether from the new
+    values or one new + one existing) is rejected with ``ValueError``.
+
+    **Series rebuild.** When ``event`` is a series master and the request
+    touches any recurrence input (``recurrence_type`` / ``recurrence_interval``
+    / ``recurrence_weekdays`` / ``recurrence_until`` / ``recurrence_count``) or
+    ``start`` (the DTSTART anchor), the canonical RRULE is rebuilt from the
+    supplied recurrence spec — symmetrically to :func:`create_event`, and with
+    the same validation (:class:`~.recurrence.InvalidRecurrence`). Because the
+    library stores only the canonical RRULE (never its constituent inputs), a
+    recurrence edit **re-specifies the whole rule**: unspecified recurrence
+    params fall back to ``None``/unset exactly as at create time — send the
+    complete spec, do not expect a partial merge into the stored RRULE.
+
+    **Fate of materialized occurrence exceptions.** The only per-instant state
+    the engine persists is materialized occurrence child rows (a reschedule, an
+    RSVP, an attached app resource, or a CANCELLED tombstone — the EXDATE
+    analog). After a rebuild each child is reconciled against the NEW rule by
+    its ``recurrence_id`` (the original rule instant it stands for):
+
+    - the instant is **still** an instant of the new rule → the child is kept
+      untouched (its reschedule/RSVPs/resource/tombstone survive);
+    - the instant is **gone** and the child is a CANCELLED tombstone → it is
+      **deleted** (an EXDATE for an instant that no longer exists is
+      meaningless);
+    - the instant is **gone** and the child carries real state → it is
+      **detached into a standalone event** (``recurrence_parent`` and
+      ``recurrence_id`` cleared): a rule edit never silently destroys a user's
+      RSVPs or an app's attached resource — the occurrence simply survives as
+      an independent event at its own start/end.
+
+    Turning recurrence off (``recurrence_type="none"``) rebuilds to an empty
+    RRULE: the master becomes a standalone event and every former child is
+    orphaned by the same rules above.
+    """
+    touches_rule = bool(changes) and (
+        event.is_series_master
+        and (
+            "start" in changes
+            or any(f in changes for f in _RRULE_INPUT_FIELDS)
+        )
+    )
+
+    for name in _SIMPLE_FIELDS:
+        if name in changes:
+            setattr(event, name, changes[name])
+    if event.end < event.start:
+        raise ValueError("event end must not be before start")
+
+    update_fields = [f for f in _SIMPLE_FIELDS if f in changes]
+
+    if touches_rule:
+        recurrence_type = changes.get("recurrence_type", event.recurrence_type)
+        event.rrule = build_rrule(
+            recurrence_type,
+            interval=changes.get("recurrence_interval"),
+            byweekday=changes.get("recurrence_weekdays") or None,
+            until=changes.get("recurrence_until"),
+            count=changes.get("recurrence_count"),
+            dtstart=event.start,
+        )
+        event.recurrence_type = recurrence_type
+        update_fields += ["rrule", "recurrence_type"]
+
+    if update_fields:
+        # updated_at is auto_now; include it so the mtime advances.
+        event.save(update_fields=sorted(set(update_fields)) + ["updated_at"])
+
+    if touches_rule:
+        _reconcile_occurrences(event)
+    return event
+
+
+def _reconcile_occurrences(master: Event) -> None:
+    """Reconcile a rebuilt master's materialized children against its new rule.
+
+    See :func:`update_event` for the semantics: keep children on still-valid
+    instants, delete orphaned tombstones, detach orphaned real occurrences into
+    standalone events.
+    """
+    for child in master.occurrences.all():
+        instant = child.recurrence_id or child.start
+        still_valid = bool(master.rrule) and is_rule_instant(
+            master.rrule, master.start, instant
+        )
+        if still_valid:
+            continue
+        if child.status == EventStatus.CANCELLED:
+            child.delete()
+            continue
+        child.recurrence_parent = None
+        child.recurrence_id = None
+        child.save(update_fields=["recurrence_parent", "recurrence_id", "updated_at"])
+
+
 # ── Recurrence: virtual expansion + on-demand materialization ───────────
 
 

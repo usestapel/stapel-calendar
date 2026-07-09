@@ -20,6 +20,12 @@ The four documented extension seams (see MODULE.md):
   custom RRULE presets without restating the built-ins (``None`` removes).
 - the *resource hook* is the ``calendar.occurrence.materialized`` comm
   emit (schemas/emits/) — no setting; app-layers subscribe.
+
+``VISIBILITY`` is the one CTO-facing **config axis** (capability-config.md
+§16): ``participants`` (default) scopes an event's read surface to its
+invitees; ``scope`` opens every event to the whole scope the SCOPE_PROVIDER
+resolves (the workspace/org/tenant). It is the ONE key surfaced as an axis in
+capabilities.json — the rest are tuning knobs or extension seams.
 """
 from stapel_core.conf import AppSettings
 
@@ -54,6 +60,14 @@ DEFAULTS = {
         "PRESETS": {},
         # Default slot length (minutes) for availability slot computation.
         "DEFAULT_SLOT_MINUTES": 30,
+        # Visibility axis (capability-config.md §16). "participants": an event
+        # is visible only to its invitees (the request user must be a
+        # participant) — the historical, fail-closed default. "scope": events
+        # are visible to the whole scope the SCOPE_PROVIDER resolves for the
+        # request (workspace/org/tenant-wide calendars). Any value other than
+        # "scope" is treated as "participants" — an unknown value degrades to
+        # the restrictive default rather than accidentally exposing events.
+        "VISIBILITY": "participants",
 }
 
 calendar_settings = AppSettings(

@@ -1,5 +1,5 @@
 {
-  "_comment": "Hand-curated layer of docs/capabilities.json (capability-config.md §2 p.3). The emitter (stapel_calendar/_capabilities.py) merges this over the derived axes; calendar's settings are all tuning knobs or extension seams, so axes is empty by design — provides/requires/extension_points still feed the capability catalog. Keep language business-facing — it surfaces in CTO conversations, not in code.",
+  "_comment": "Hand-curated layer of docs/capabilities.json (capability-config.md §2 p.3). The emitter (stapel_calendar/_capabilities.py) merges this over the derived axes. Calendar exposes ONE CTO-facing config axis — VISIBILITY (participants|scope, §16) — curated below; the rest of its settings are tuning knobs or extension seams and are not axes. Keep language business-facing — it surfaces in CTO conversations, not in code.",
   "provides": "Calendar and scheduling: events with participants and RSVP, RFC 5545 recurring series (virtual expansion, on-demand materialization, per-instant cancellation and reschedule), availability windows with free/busy and bookable slot computation, ICS export, and event-driven reminders.",
   "requires": [
     {
@@ -45,5 +45,11 @@
       "summary": "Every view declares request/response serializer seams (SerializerSeamMixin) — subclass the view, override the attribute, remount the URL."
     }
   ],
-  "axes": {}
+  "axes": {
+    "VISIBILITY": {
+      "business_label": "Who can see an event",
+      "summary": "Controls the read surface of every event. \"participants\" (default) shows an event only to the people invited to it — the private-calendar model. \"scope\" makes events visible to everyone in the same workspace/org/tenant (as resolved by the scope provider) — a shared team calendar. Values: participants, scope. It changes what listing, calendar and detail endpoints return, not which endpoints exist.",
+      "behavior": "participants: event read access is limited to its invitees; scope: events are visible to the whole resolved scope (workspace/org/tenant)."
+    }
+  }
 }
