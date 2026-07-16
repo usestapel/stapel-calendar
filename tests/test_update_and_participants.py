@@ -314,3 +314,78 @@ class TestVisibilityAxis:
         )
         assert resp.status_code == 200
         assert len(resp.json()["occurrences"]) >= 4
+
+
+# ── Regression: partial update merges unsent recurrence params ──────────
+
+
+@pytest.mark.django_db
+class TestRecurrenceParamMergeOnPartialUpdate:
+    """Moving a bounded series' start without re-sending the recurrence spec
+    must NOT silently make the series infinite (or drop weekdays/interval):
+    update_event merges unsent recurrence params from the stored RRULE."""
+
+    def test_start_move_keeps_until(self, user):
+        master = services.create_event(
+            owner=user, title="Bounded", start=_dt(5), end=_dt(5, 10),
+            recurrence_type="weekly",
+            recurrence_until=_dt(26),
+        )
+        assert "UNTIL=20260126" in master.rrule
+        services.update_event(master, {"start": _dt(6), "end": _dt(6, 10)})
+        master.refresh_from_db()
+        assert master.start == _dt(6)
+        # The bound survives the DTSTART move.
+        assert "UNTIL=20260126" in master.rrule
+        assert "COUNT" not in master.rrule
+
+    def test_start_move_keeps_count_interval_weekdays(self, user):
+        master = services.create_event(
+            owner=user, title="Custom", start=_dt(5), end=_dt(5, 10),
+            recurrence_type="custom",
+            recurrence_weekdays=[0, 2],
+            recurrence_interval=2,
+            recurrence_count=7,
+        )
+        services.update_event(master, {"start": _dt(6), "end": _dt(6, 10)})
+        master.refresh_from_db()
+        assert "BYDAY=MO,WE" in master.rrule
+        assert "INTERVAL=2" in master.rrule
+        assert "COUNT=7" in master.rrule
+
+    def test_explicit_until_evicts_stored_count(self, user):
+        master = services.create_event(
+            owner=user, title="Counted", start=_dt(5), end=_dt(5, 10),
+            recurrence_type="weekly",
+            recurrence_count=5,
+        )
+        # count/until are mutually exclusive: sending until must drop the
+        # stored count instead of raising InvalidRecurrence.
+        services.update_event(master, {"recurrence_until": _dt(26)})
+        master.refresh_from_db()
+        assert "UNTIL=20260126" in master.rrule
+        assert "COUNT" not in master.rrule
+
+    def test_explicit_count_evicts_stored_until(self, user):
+        master = services.create_event(
+            owner=user, title="Bounded", start=_dt(5), end=_dt(5, 10),
+            recurrence_type="weekly",
+            recurrence_until=_dt(26),
+        )
+        services.update_event(master, {"recurrence_count": 3})
+        master.refresh_from_db()
+        assert "COUNT=3" in master.rrule
+        assert "UNTIL" not in master.rrule
+
+    def test_type_change_is_full_respec(self, user):
+        """An explicit recurrence_type change re-specifies the whole rule:
+        stored params of the old rule do not leak into the new preset."""
+        master = services.create_event(
+            owner=user, title="Bounded", start=_dt(5), end=_dt(5, 10),
+            recurrence_type="custom",
+            recurrence_weekdays=[0],
+            recurrence_until=_dt(26),
+        )
+        services.update_event(master, {"recurrence_type": "daily"})
+        master.refresh_from_db()
+        assert master.rrule == "FREQ=DAILY"

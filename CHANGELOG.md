@@ -4,6 +4,26 @@ All notable changes to stapel-calendar are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Pre-1.0 semver: **minor = breaking**, patch = compatible.
 
+## [0.3.3] — 2026-07-16
+
+### Fixed
+- **`update_event` no longer silently unbounds a recurring series on a
+  partial update.** The RRULE of a series master was rebuilt from *only* the
+  explicitly sent fields, so moving `start` without re-sending
+  `recurrence_until` / `recurrence_weekdays` / `recurrence_interval` /
+  `recurrence_count` dropped them — a bounded series quietly became infinite.
+  Unsent recurrence params are now recovered from the stored canonical RRULE
+  (new `recurrence.rrule_inputs`) and merged under the sent ones. Exceptions:
+  an explicit `recurrence_type` change still re-specifies the whole rule, and
+  explicitly sending `recurrence_count` or `recurrence_until` evicts the
+  other stored bound (RFC 5545 mutual exclusivity) instead of raising.
+
+## [0.3.2] — 2026-07-11
+
+### Changed
+- Repinned `stapel-core` to the `>=0.10,<0.11` window (the published 0.10.0;
+  the old `>=0.8,<0.9` pin no longer resolved against PyPI). No code changes.
+
 ## [0.3.1] — 2026-07-10
 
 ### Fixed

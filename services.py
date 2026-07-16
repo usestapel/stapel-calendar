@@ -26,6 +26,7 @@ from .recurrence import (
     build_rrule,
     expand_rule_detailed,
     is_rule_instant,
+    rrule_inputs,
 )
 
 
@@ -165,11 +166,18 @@ def update_event(event: Event, changes: dict) -> Event:
     / ``recurrence_weekdays`` / ``recurrence_until`` / ``recurrence_count``) or
     ``start`` (the DTSTART anchor), the canonical RRULE is rebuilt from the
     supplied recurrence spec — symmetrically to :func:`create_event`, and with
-    the same validation (:class:`~.recurrence.InvalidRecurrence`). Because the
-    library stores only the canonical RRULE (never its constituent inputs), a
-    recurrence edit **re-specifies the whole rule**: unspecified recurrence
-    params fall back to ``None``/unset exactly as at create time — send the
-    complete spec, do not expect a partial merge into the stored RRULE.
+    the same validation (:class:`~.recurrence.InvalidRecurrence`). The library
+    stores only the canonical RRULE (never its constituent inputs), so the
+    unsent recurrence params are **recovered from the stored rule**
+    (:func:`~.recurrence.rrule_inputs`) and merged under the sent ones —
+    partial semantics apply to recurrence too. Moving a bounded series' start
+    without re-sending ``recurrence_until`` keeps the bound (it used to
+    silently make the series infinite). Two exceptions: an explicit
+    ``recurrence_type`` change re-specifies the whole rule (old params never
+    leak into a different preset — send the complete spec with the new type);
+    and ``recurrence_count`` / ``recurrence_until`` are mutually exclusive
+    (RFC 5545), so explicitly sending either one drops the *other* stored
+    bound instead of raising.
 
     **Fate of materialized occurrence exceptions.** The only per-instant state
     the engine persists is materialized occurrence child rows (a reschedule, an
@@ -210,12 +218,32 @@ def update_event(event: Event, changes: dict) -> Event:
 
     if touches_rule:
         recurrence_type = changes.get("recurrence_type", event.recurrence_type)
+        # Partial semantics for recurrence params too: recover the params the
+        # client did not send from the stored canonical RRULE and merge the
+        # sent ones over them. Exceptions: an explicit recurrence_type change
+        # re-specifies the whole rule (stored params of the old rule do not
+        # leak into a different preset), and count/until are mutually
+        # exclusive (RFC 5545) — an explicitly sent one evicts the other's
+        # stored value.
+        if "recurrence_type" in changes:
+            stored = rrule_inputs("")
+        else:
+            stored = rrule_inputs(event.rrule)
+        if "recurrence_count" in changes:
+            stored["until"] = None
+        if "recurrence_until" in changes:
+            stored["count"] = None
+        weekdays = (
+            changes["recurrence_weekdays"]
+            if "recurrence_weekdays" in changes
+            else stored["weekdays"]
+        )
         event.rrule = build_rrule(
             recurrence_type,
-            interval=changes.get("recurrence_interval"),
-            byweekday=changes.get("recurrence_weekdays") or None,
-            until=changes.get("recurrence_until"),
-            count=changes.get("recurrence_count"),
+            interval=changes.get("recurrence_interval", stored["interval"]),
+            byweekday=weekdays or None,
+            until=changes.get("recurrence_until", stored["until"]),
+            count=changes.get("recurrence_count", stored["count"]),
             dtstart=event.start,
         )
         event.recurrence_type = recurrence_type

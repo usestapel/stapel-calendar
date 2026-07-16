@@ -342,3 +342,50 @@ def is_rule_instant(rule_text: str, dtstart: datetime, instant: datetime) -> boo
         # naive/aware mix between the series start and the queried instant.
         raise InvalidRecurrence(str(exc)) from exc
     return candidate is not None and as_utc(candidate) == as_utc(instant)
+
+
+def rrule_inputs(rule_text: str) -> dict:
+    """Inverse of :func:`build_rrule` for the *canonical* rules it emits:
+    recover the runtime recurrence params (``interval`` / ``weekdays`` /
+    ``until`` / ``count``) from a stored RRULE line.
+
+    Used by partial update (PATCH) to merge unsent recurrence params from
+    the stored rule instead of silently dropping them — e.g. moving a
+    bounded series' ``start`` must not erase its ``UNTIL``.
+
+    Returns ``{"interval": int|None, "weekdays": list[int]|None,
+    "until": datetime|None, "count": int|None}``; everything ``None``/absent
+    for an empty rule. ``UNTIL`` in the ``Z`` form parses to an aware UTC
+    datetime, the floating form to a naive one — matching what
+    :func:`build_rrule` will re-serialize. Unknown parts are ignored
+    (defensive; canonical rules contain none).
+    """
+    out: dict = {"interval": None, "weekdays": None, "until": None, "count": None}
+    if not rule_text:
+        return out
+    token_index = {tok: i for i, tok in enumerate(_BYDAY_TOKENS)}
+    for part in rule_text.split(";"):
+        key, _, value = part.partition("=")
+        key = key.strip().upper()
+        if not value:
+            continue
+        if key == "INTERVAL":
+            out["interval"] = int(value)
+        elif key == "BYDAY":
+            try:
+                out["weekdays"] = sorted(
+                    token_index[tok.strip().upper()] for tok in value.split(",")
+                )
+            except KeyError as exc:  # pragma: no cover - defensive
+                raise InvalidRecurrence(f"unknown BYDAY token in {value!r}") from exc
+        elif key == "COUNT":
+            out["count"] = int(value)
+        elif key == "UNTIL":
+            v = value.strip()
+            if v.endswith("Z"):
+                out["until"] = datetime.strptime(v, "%Y%m%dT%H%M%SZ").replace(
+                    tzinfo=timezone.utc
+                )
+            else:
+                out["until"] = datetime.strptime(v, "%Y%m%dT%H%M%S")
+    return out
