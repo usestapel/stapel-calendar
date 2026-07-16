@@ -4,6 +4,14 @@ All notable changes to stapel-calendar are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Pre-1.0 semver: **minor = breaking**, patch = compatible.
 
+## [0.3.5] — 2026-07-17
+
+### Changed
+- `stapel-core` ceiling raised `>=0.10,<0.11` → `>=0.10,<0.12` (core 0.11
+  fleet re-pin: default bus, nav, config-checks, error params/language —
+  additive for modules). Contract artifacts regenerated (version bump);
+  suite green.
+
 ## [0.3.3] — 2026-07-16
 
 ### Fixed

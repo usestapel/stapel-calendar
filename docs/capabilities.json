@@ -1,6 +1,6 @@
 {
   "module": "stapel-calendar",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "provides": "Calendar and scheduling: events with participants and RSVP, RFC 5545 recurring series (virtual expansion, on-demand materialization, per-instant cancellation and reschedule), availability windows with free/busy and bookable slot computation, ICS export, and event-driven reminders.",
   "axes": [
     {
