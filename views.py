@@ -155,7 +155,7 @@ class EventListCreateView(SerializerSeamMixin, APIView):
     response_serializer_class = EventResponseSerializer
 
     @extend_schema(responses={200: EventResponseSerializer(many=True)})
-    def get(self, request):
+    def get(self, request):  # noqa: R007
         try:
             start, end = _parse_range(request)
         except ValueError:
@@ -175,7 +175,7 @@ class EventListCreateView(SerializerSeamMixin, APIView):
         request=EventCreateRequestSerializer,
         responses={201: EventResponseSerializer},
     )
-    def post(self, request):
+    def post(self, request):  # noqa: R007
         ser = self.get_request_serializer_class()(data=request.data)
         ser.is_valid(raise_exception=True)
         data = ser.validated_data
@@ -232,7 +232,7 @@ class EventDetailView(SerializerSeamMixin, APIView):
         return qs.prefetch_related("participants").filter(id=event_id).first()
 
     @extend_schema(responses={200: EventResponseSerializer})
-    def get(self, request, event_id):
+    def get(self, request, event_id):  # noqa: R007
         event = self._get(request, event_id)
         if event is None:
             return StapelErrorResponse(404, ERR_404_EVENT_NOT_FOUND)
@@ -243,7 +243,7 @@ class EventDetailView(SerializerSeamMixin, APIView):
         request=EventUpdateRequestSerializer,
         responses={200: EventResponseSerializer},
     )
-    def patch(self, request, event_id):
+    def patch(self, request, event_id):  # noqa: R007
         event = self._get(request, event_id)
         if event is None:
             return StapelErrorResponse(404, ERR_404_EVENT_NOT_FOUND)
@@ -275,7 +275,7 @@ class EventDetailView(SerializerSeamMixin, APIView):
         return StapelResponse(response_cls(event_to_dto(event)))
 
     @extend_schema(responses={200: EventResponseSerializer})
-    def delete(self, request, event_id):
+    def delete(self, request, event_id):  # noqa: R007
         event = self._get(request, event_id)
         if event is None:
             return StapelErrorResponse(404, ERR_404_EVENT_NOT_FOUND)
@@ -287,9 +287,9 @@ class EventDetailView(SerializerSeamMixin, APIView):
             # analog) instead of removing the row.
             event.status = EventStatus.CANCELLED
             event.save(update_fields=["status", "updated_at"])
-            return StapelResponse({"status": "cancelled"})
+            return StapelResponse({"status": "cancelled"})  # noqa: R006
         event.delete()
-        return StapelResponse({"status": "deleted"})
+        return StapelResponse({"status": "deleted"})  # noqa: R006
 
 
 @extend_schema(tags=["Calendar"])
@@ -303,7 +303,7 @@ class EventRespondView(SerializerSeamMixin, APIView):
     @extend_schema(
         request=RSVPRequestSerializer, responses={200: EventResponseSerializer}
     )
-    def post(self, request, event_id):
+    def post(self, request, event_id):  # noqa: R007
         ser = self.get_request_serializer_class()(data=request.data)
         ser.is_valid(raise_exception=True)
         rsvp = ser.validated_data.rsvp
@@ -336,7 +336,7 @@ class EventParticipantsView(SerializerSeamMixin, APIView):
         request=ParticipantsReplaceRequestSerializer,
         responses={200: EventResponseSerializer},
     )
-    def put(self, request, event_id):
+    def put(self, request, event_id):  # noqa: R007
         event = self._get(request, event_id)
         if event is None:
             return StapelErrorResponse(404, ERR_404_EVENT_NOT_FOUND)
@@ -380,7 +380,7 @@ class CalendarView(SerializerSeamMixin, APIView):
     response_serializer_class = CalendarResponseSerializer
 
     @extend_schema(responses={200: CalendarResponseSerializer})
-    def get(self, request):
+    def get(self, request):  # noqa: R007
         try:
             start, end = _parse_range(request)
         except ValueError:
@@ -415,7 +415,7 @@ class AvailabilityView(SerializerSeamMixin, APIView):
     response_serializer_class = AvailabilityResponseSerializer
 
     @extend_schema(responses={200: AvailabilityResponseSerializer})
-    def get(self, request):
+    def get(self, request):  # noqa: R007
         try:
             start, end = _parse_range(request)
         except ValueError:

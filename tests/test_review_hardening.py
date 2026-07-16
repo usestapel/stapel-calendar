@@ -225,7 +225,7 @@ class TestH3CancellationModel:
         series = _daily_series(user)
         row = services.materialize(series, JAN7)
         api_client.force_authenticate(user=user)
-        resp = api_client.delete(f"/calendar/api/events/{row.id}")
+        resp = api_client.delete(f"/calendar/api/v1/events/{row.id}")
         assert resp.status_code == 200
         assert resp.json()["status"] == "cancelled"
         row.refresh_from_db()  # tombstone kept, not deleted
@@ -241,7 +241,7 @@ class TestH3CancellationModel:
             end=JAN7 + timedelta(hours=1),
         )
         api_client.force_authenticate(user=user)
-        resp = api_client.delete(f"/calendar/api/events/{ev.id}")
+        resp = api_client.delete(f"/calendar/api/v1/events/{ev.id}")
         assert resp.status_code == 200
         assert resp.json()["status"] == "deleted"
         assert not Event.objects.filter(id=ev.id).exists()
@@ -365,7 +365,7 @@ class TestH4SlotMinutesDos:
     @pytest.mark.parametrize("bad", ["0", "-5", "abc"])
     def test_availability_view_rejects_bad_slot_minutes(self, auth_client, bad):
         resp = auth_client.get(
-            "/calendar/api/availability"
+            "/calendar/api/v1/availability"
             f"?start=2026-01-05T00:00:00Z&end=2026-01-06T00:00:00Z&slot_minutes={bad}"
         )
         assert resp.status_code == 400
@@ -515,7 +515,7 @@ class TestM3TruncationFlag:
             recurrence_type="daily",
         )
         resp = auth_client.get(
-            "/calendar/api/availability"
+            "/calendar/api/v1/availability"
             "?start=2026-01-01T00:00:00Z&end=2026-02-01T00:00:00Z"
         )
         assert resp.status_code == 200

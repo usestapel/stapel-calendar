@@ -26,7 +26,7 @@ class TestUpdateEventAPI:
             owner=user, title="Old", start=_dt(5), end=_dt(5, 10)
         )
         resp = auth_client.patch(
-            f"/calendar/api/events/{ev.id}",
+            f"/calendar/api/v1/events/{ev.id}",
             {"title": "New", "description": "d"},
             format="json",
         )
@@ -44,7 +44,7 @@ class TestUpdateEventAPI:
             owner=user, title="Keep", description="orig", start=_dt(5), end=_dt(5, 10)
         )
         resp = auth_client.patch(
-            f"/calendar/api/events/{ev.id}", {"title": "Renamed"}, format="json"
+            f"/calendar/api/v1/events/{ev.id}", {"title": "Renamed"}, format="json"
         )
         assert resp.status_code == 200
         ev.refresh_from_db()
@@ -57,7 +57,7 @@ class TestUpdateEventAPI:
         )
         # New end before existing start.
         resp = auth_client.patch(
-            f"/calendar/api/events/{ev.id}",
+            f"/calendar/api/v1/events/{ev.id}",
             {"end": "2026-01-05T08:00:00+00:00"},
             format="json",
         )
@@ -71,14 +71,14 @@ class TestUpdateEventAPI:
         )
         api_client.force_authenticate(user=other_user)
         resp = api_client.patch(
-            f"/calendar/api/events/{ev.id}", {"title": "hijack"}, format="json"
+            f"/calendar/api/v1/events/{ev.id}", {"title": "hijack"}, format="json"
         )
         assert resp.status_code == 403
         assert resp.json()["localizable_error"] == "error.403.calendar_not_event_owner"
 
     def test_patch_missing_event_404(self, auth_client):
         resp = auth_client.patch(
-            "/calendar/api/events/3fa85f64-5717-4562-b3fc-2c963f66afa6",
+            "/calendar/api/v1/events/3fa85f64-5717-4562-b3fc-2c963f66afa6",
             {"title": "x"},
             format="json",
         )
@@ -91,7 +91,7 @@ class TestUpdateEventAPI:
         )
         assert ev.rrule == "FREQ=WEEKLY"
         resp = auth_client.patch(
-            f"/calendar/api/events/{ev.id}",
+            f"/calendar/api/v1/events/{ev.id}",
             {"recurrence_type": "weekdays"},
             format="json",
         )
@@ -104,7 +104,7 @@ class TestUpdateEventAPI:
             recurrence_type="weekly",
         )
         resp = auth_client.patch(
-            f"/calendar/api/events/{ev.id}",
+            f"/calendar/api/v1/events/{ev.id}",
             {"recurrence_type": "custom"},  # custom needs weekdays
             format="json",
         )
@@ -185,7 +185,7 @@ class TestReplaceParticipantsAPI:
         )
         # Replace {owner, other_user} with {owner} only.
         resp = auth_client.put(
-            f"/calendar/api/events/{ev.id}/participants",
+            f"/calendar/api/v1/events/{ev.id}/participants",
             {"participant_ids": []},
             format="json",
         )
@@ -201,7 +201,7 @@ class TestReplaceParticipantsAPI:
             owner=user, title="M", start=_dt(5), end=_dt(5, 10)
         )
         resp = auth_client.put(
-            f"/calendar/api/events/{ev.id}/participants",
+            f"/calendar/api/v1/events/{ev.id}/participants",
             {"participant_ids": [str(other_user.id)]},
             format="json",
         )
@@ -218,7 +218,7 @@ class TestReplaceParticipantsAPI:
         services.respond(ev, other_user, RSVP.ACCEPTED)
         # Re-send a list that still contains other_user — RSVP must survive.
         auth_client.put(
-            f"/calendar/api/events/{ev.id}/participants",
+            f"/calendar/api/v1/events/{ev.id}/participants",
             {"participant_ids": [str(other_user.id)]},
             format="json",
         )
@@ -233,7 +233,7 @@ class TestReplaceParticipantsAPI:
         )
         api_client.force_authenticate(user=other_user)
         resp = api_client.put(
-            f"/calendar/api/events/{ev.id}/participants",
+            f"/calendar/api/v1/events/{ev.id}/participants",
             {"participant_ids": []},
             format="json",
         )
@@ -242,7 +242,7 @@ class TestReplaceParticipantsAPI:
 
     def test_replace_missing_event_404(self, auth_client):
         resp = auth_client.put(
-            "/calendar/api/events/3fa85f64-5717-4562-b3fc-2c963f66afa6/participants",
+            "/calendar/api/v1/events/3fa85f64-5717-4562-b3fc-2c963f66afa6/participants",
             {"participant_ids": []},
             format="json",
         )
@@ -264,7 +264,7 @@ class TestVisibilityAxis:
         )
         api_client.force_authenticate(user=other_user)
         resp = api_client.get(
-            "/calendar/api/events?start=2026-01-01T00:00:00Z&end=2026-01-31T00:00:00Z"
+            "/calendar/api/v1/events?start=2026-01-01T00:00:00Z&end=2026-01-31T00:00:00Z"
         )
         assert resp.status_code == 200
         assert resp.json() == []
@@ -279,7 +279,7 @@ class TestVisibilityAxis:
         )
         api_client.force_authenticate(user=other_user)
         resp = api_client.get(
-            "/calendar/api/events?start=2026-01-01T00:00:00Z&end=2026-01-31T00:00:00Z"
+            "/calendar/api/v1/events?start=2026-01-01T00:00:00Z&end=2026-01-31T00:00:00Z"
         )
         assert resp.status_code == 200
         assert [e["title"] for e in resp.json()] == ["Shared"]
@@ -294,7 +294,7 @@ class TestVisibilityAxis:
         )
         api_client.force_authenticate(user=other_user)
         resp = api_client.get(
-            "/calendar/api/events?start=2026-01-01T00:00:00Z&end=2026-01-31T00:00:00Z"
+            "/calendar/api/v1/events?start=2026-01-01T00:00:00Z&end=2026-01-31T00:00:00Z"
         )
         assert resp.status_code == 200
         assert resp.json() == []
@@ -310,7 +310,7 @@ class TestVisibilityAxis:
         )
         api_client.force_authenticate(user=other_user)
         resp = api_client.get(
-            "/calendar/api/calendar?start=2026-01-01T00:00:00Z&end=2026-02-01T00:00:00Z"
+            "/calendar/api/v1/calendar?start=2026-01-01T00:00:00Z&end=2026-02-01T00:00:00Z"
         )
         assert resp.status_code == 200
         assert len(resp.json()["occurrences"]) >= 4

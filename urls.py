@@ -1,64 +1,15 @@
-"""URL patterns — no global prefix here, the host project mounts them:
+"""Root URLconf for stapel-calendar — v1 canon mount (api-versioning.md §2, §6).
 
-    path("calendar/", include("stapel_calendar.urls"))
+Canon: ``/<mod>/api/v1/...`` — the version segment sits right after ``api/``.
+The host mounts ``include('stapel_calendar.urls')`` under ``calendar/``; this
+module contributes the ``api/v1/`` prefix (the ``api/`` segment historically
+lives inside this package, not in the host mount). The actual URL set lives
+in ``urls_v1.py``; ``GATE_REGISTRY`` is re-exported here.
 """
-from typing import NamedTuple
+from django.urls import include, path
 
-from django.urls import path
-
-from .views import (
-    AvailabilityView,
-    CalendarView,
-    EventDetailView,
-    EventICSView,
-    EventListCreateView,
-    EventParticipantsView,
-    EventRespondView,
-)
+from stapel_calendar.urls_v1 import GATE_REGISTRY  # noqa: F401  (re-export)
 
 urlpatterns = [
-    path("api/events", EventListCreateView.as_view(), name="calendar-events"),
-    path(
-        "api/events/<uuid:event_id>",
-        EventDetailView.as_view(),
-        name="calendar-event-detail",
-    ),
-    path(
-        "api/events/<uuid:event_id>/participants",
-        EventParticipantsView.as_view(),
-        name="calendar-event-participants",
-    ),
-    path(
-        "api/events/<uuid:event_id>/respond",
-        EventRespondView.as_view(),
-        name="calendar-event-respond",
-    ),
-    path(
-        "api/events/<uuid:event_id>/ics",
-        EventICSView.as_view(),
-        name="calendar-event-ics",
-    ),
-    path("api/calendar", CalendarView.as_view(), name="calendar-user-calendar"),
-    path("api/availability", AvailabilityView.as_view(), name="calendar-availability"),
+    path('api/v1/', include('stapel_calendar.urls_v1')),
 ]
-
-
-class GateEntry(NamedTuple):
-    """One gated URL block: which flags gate which url patterns (capability-config.md §2 p.2).
-
-    ``flags`` compose with OR — the block is mounted while ANY flag is on,
-    and disappears only when ALL of them are off. Empty flags = always on.
-    """
-    name: str
-    flags: tuple
-    patterns: tuple
-
-
-#: Gate registry (capability-config.md §2 p.2): calendar has no per-method
-#: config gates (its settings are tuning knobs and dotted-path seams, none
-#: unmounts endpoints) — the whole URL surface is a single always-on block.
-#: Declared as a registry entry (rather than left implicit) so the
-#: capabilities.json emitter has a uniform mechanism across every module.
-GATE_REGISTRY: dict = {
-    'calendar.api': GateEntry('calendar.api', (), tuple(urlpatterns)),
-}

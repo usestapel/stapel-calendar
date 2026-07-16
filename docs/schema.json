@@ -5,9 +5,9 @@
     "version": "0.0.0"
   },
   "paths": {
-    "/calendar/api/availability": {
+    "/calendar/api/v1/availability": {
       "get": {
-        "operationId": "calendar_api_availability_retrieve",
+        "operationId": "calendar_api_v1_availability_retrieve",
         "description": "Free/busy + open booking slots for the requesting user over a range.\n\n**Permissions:** `IsAuthenticated`",
         "tags": [
           "Calendar"
@@ -31,9 +31,9 @@
         }
       }
     },
-    "/calendar/api/calendar": {
+    "/calendar/api/v1/calendar": {
       "get": {
-        "operationId": "calendar_api_calendar_retrieve",
+        "operationId": "calendar_api_v1_calendar_retrieve",
         "description": "The requesting user's calendar over a range: concrete events plus the\nvirtual+materialized occurrences of every series they're on.\n\n**Permissions:** `IsAuthenticated`",
         "tags": [
           "Calendar"
@@ -57,9 +57,9 @@
         }
       }
     },
-    "/calendar/api/events": {
+    "/calendar/api/v1/events": {
       "get": {
-        "operationId": "calendar_api_events_list",
+        "operationId": "calendar_api_v1_events_list",
         "description": "List the requesting user's events in a range, or create an event.\n\n**Permissions:** `IsAuthenticated`",
         "tags": [
           "Calendar"
@@ -86,7 +86,7 @@
         }
       },
       "post": {
-        "operationId": "calendar_api_events_create",
+        "operationId": "calendar_api_v1_events_create",
         "description": "List the requesting user's events in a range, or create an event.\n\n**Permissions:** `IsAuthenticated`",
         "tags": [
           "Calendar"
@@ -130,9 +130,9 @@
         }
       }
     },
-    "/calendar/api/events/{event_id}": {
+    "/calendar/api/v1/events/{event_id}": {
       "get": {
-        "operationId": "calendar_api_events_retrieve",
+        "operationId": "calendar_api_v1_events_retrieve",
         "description": "Retrieve/update/delete a single event (mutations owner-only).\n\n**Permissions:** `IsAuthenticated`",
         "parameters": [
           {
@@ -167,7 +167,7 @@
         }
       },
       "patch": {
-        "operationId": "calendar_api_events_partial_update",
+        "operationId": "calendar_api_v1_events_partial_update",
         "description": "Retrieve/update/delete a single event (mutations owner-only).\n\n**Permissions:** `IsAuthenticated`",
         "parameters": [
           {
@@ -221,7 +221,7 @@
         }
       },
       "delete": {
-        "operationId": "calendar_api_events_destroy",
+        "operationId": "calendar_api_v1_events_destroy",
         "description": "Retrieve/update/delete a single event (mutations owner-only).\n\n**Permissions:** `IsAuthenticated`",
         "parameters": [
           {
@@ -256,9 +256,9 @@
         }
       }
     },
-    "/calendar/api/events/{event_id}/ics": {
+    "/calendar/api/v1/events/{event_id}/ics": {
       "get": {
-        "operationId": "calendar_api_events_ics_retrieve",
+        "operationId": "calendar_api_v1_events_ics_retrieve",
         "description": "Export an event (series RRULE included) as an RFC 5545 .ics file.\n\n**Permissions:** `IsAuthenticated`",
         "parameters": [
           {
@@ -286,9 +286,9 @@
         }
       }
     },
-    "/calendar/api/events/{event_id}/participants": {
+    "/calendar/api/v1/events/{event_id}/participants": {
       "put": {
-        "operationId": "calendar_api_events_participants_update",
+        "operationId": "calendar_api_v1_events_participants_update",
         "description": "Replace an event's participant set (replace-set semantics, owner-only).\n\n**Permissions:** `IsAuthenticated`",
         "parameters": [
           {
@@ -342,9 +342,9 @@
         }
       }
     },
-    "/calendar/api/events/{event_id}/respond": {
+    "/calendar/api/v1/events/{event_id}/respond": {
       "post": {
-        "operationId": "calendar_api_events_respond_create",
+        "operationId": "calendar_api_v1_events_respond_create",
         "description": "Record the requesting user's RSVP to an event.\n\n**Permissions:** `IsAuthenticated`",
         "parameters": [
           {

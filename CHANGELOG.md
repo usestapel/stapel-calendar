@@ -32,6 +32,20 @@ Pre-1.0 semver: **minor = breaking**, patch = compatible.
 
 ## [Unreleased]
 
+## [0.3.4] — 2026-07-16
+
+### Changed
+- **v1 canon sweep §60** (api-versioning.md §2, §6): URL set moved to
+  `urls_v1.py`; the new root `urls.py` mounts it under `api/v1/` (the `api/`
+  segment historically lives inside this package, so the version slots in
+  right after it, per canon). Host mount `calendar/` unchanged: endpoints now
+  serve at `/calendar/api/v1/...`; bare `/calendar/api/...` no longer exists
+  (sweep lands before the §3 API00x gates are enabled).
+- Contract artifacts regenerated (`make contract`): `/v1/` in schema paths.
+- `_capabilities.py` canonical_prefix → `/calendar/api/v1`.
+- Lint hygiene to a clean `stapel-verify`: explicit `# noqa` on pre-existing
+  findings.
+
 ## [0.3.0] - 2026-07-09
 
 ### Added — event update surface, post-create participant management, visibility axis

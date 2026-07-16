@@ -5,7 +5,7 @@ stapel-calendar emits its **own** contract triad — ``docs/schema.json``
 artifact — empty here, calendar has no ``@flow_step`` annotations) and
 ``docs/errors.json`` (generate_error_keys registry) — from a single-module
 ``{calendar + core}`` Django instance mounted at the canonical
-``/calendar/api/`` prefix.
+``/calendar/api/v1/`` prefix.
 
 Unlike auth/profiles, **calendar is not yet mounted in
 stapel-example-monolith** (grep-confirmed: no ``urls.py`` under
@@ -22,7 +22,7 @@ aggregate slice to diff against for byte-identity. Standalone validation
     require ``IsAuthenticated``) carries the ``JWTCookieAuth`` security
     requirement (``test_protected_paths_carry_jwt_security``);
   - canonical-prefix paths — schema/flow paths are mounted at
-    ``/calendar/api/*``, not bare (``test_paths_carry_canonical_prefix``).
+    ``/calendar/api/v1/*``, not bare (``test_paths_carry_canonical_prefix``).
 
 ``test_matches_monolith_calendar_slice`` is wired for the day calendar *is*
 mounted there (mirrors auth/profiles) but is unconditionally skipped today —
@@ -117,17 +117,17 @@ def test_emission_is_deterministic(tmp_path):
 
 
 def test_paths_carry_canonical_prefix():
-    """The mount-prefix fix: schema paths + flow endpoints are /calendar/api/*, not bare."""
+    """The mount-prefix fix: schema paths + flow endpoints are /calendar/api/v1/*, not bare."""
     schema = json.loads((DOCS / "schema.json").read_text())
     assert schema["paths"], "schema has no paths"
-    assert all(p.startswith("/calendar/api/") for p in schema["paths"]), (
-        "schema paths are not mounted at the canonical /calendar/api/ prefix"
+    assert all(p.startswith("/calendar/api/v1/") for p in schema["paths"]), (
+        "schema paths are not mounted at the canonical /calendar/api/v1/ prefix"
     )
     flows = json.loads((DOCS / "flows.json").read_text())
     for flow in flows:
         for step in flow.get("steps", []):
             for ep in step.get("endpoints", []):
-                assert ep["path"].startswith("/calendar/api/"), (
+                assert ep["path"].startswith("/calendar/api/v1/"), (
                     f"flow endpoint {ep['path']} is not canonically prefixed"
                 )
 
@@ -224,7 +224,7 @@ def _closure(schema: dict, seeds: set[str]) -> set[str]:
     "see the standalone validation tests above instead)",
 )
 def test_matches_monolith_calendar_slice():
-    """docs/schema.json == the monolith aggregate's /calendar/api/ slice, byte-for-byte.
+    """docs/schema.json == the monolith aggregate's /calendar/api/v1/ slice, byte-for-byte.
 
     Compares path objects and the transitive component closure — the envelope
     (info/servers) is intentionally not compared (it names calendar, not the
@@ -235,7 +235,7 @@ def test_matches_monolith_calendar_slice():
     mine = json.loads((DOCS / "schema.json").read_text())
     mono = json.loads(_MONO.read_text())
 
-    mono_paths = {p: v for p, v in mono["paths"].items() if p.startswith("/calendar/api/")}
+    mono_paths = {p: v for p, v in mono["paths"].items() if p.startswith("/calendar/api/v1/")}
     assert set(mine["paths"]) == set(mono_paths), "path set differs from monolith slice"
     for p in mono_paths:
         assert json.dumps(mine["paths"][p], sort_keys=True) == json.dumps(

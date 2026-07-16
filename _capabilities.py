@@ -22,7 +22,7 @@ def main(argv=None):
     return run_capabilities_cli(
         argv,
         repo=Path(__file__).resolve().parent,
-        canonical_prefix="/calendar",
+        canonical_prefix="/calendar/api/v1",
         defaults=DEFAULTS,
         registry=GATE_REGISTRY,
         is_axis=lambda k: k == "VISIBILITY",
