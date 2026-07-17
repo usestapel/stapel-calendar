@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-calendar"
-version = "0.3.5"
+version = "0.3.6"
 description = "Calendar and scheduling for the Stapel framework"
 readme = "README.md"
 license = { text = "MIT" }
@@ -23,7 +23,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "stapel-core>=0.10,<0.12",
+    "stapel-core>=0.10,<0.13",
     "python-dateutil>=2.8,<3",
 ]
 
