@@ -133,7 +133,7 @@
     "/calendar/api/v1/events/{event_id}": {
       "get": {
         "operationId": "calendar_api_v1_events_retrieve",
-        "description": "Retrieve/update/delete a single event (mutations owner-only).\n\n**Permissions:** `IsAuthenticated`",
+        "description": "Retrieve/update/delete a single event (mutations owner-only).\n\n**Permissions:** `IsNotAnonymousUser`",
         "parameters": [
           {
             "in": "path",
@@ -168,7 +168,7 @@
       },
       "patch": {
         "operationId": "calendar_api_v1_events_partial_update",
-        "description": "Retrieve/update/delete a single event (mutations owner-only).\n\n**Permissions:** `IsAuthenticated`",
+        "description": "Retrieve/update/delete a single event (mutations owner-only).\n\n**Permissions:** `IsNotAnonymousUser`",
         "parameters": [
           {
             "in": "path",
@@ -222,7 +222,7 @@
       },
       "delete": {
         "operationId": "calendar_api_v1_events_destroy",
-        "description": "Retrieve/update/delete a single event (mutations owner-only).\n\n**Permissions:** `IsAuthenticated`",
+        "description": "Retrieve/update/delete a single event (mutations owner-only).\n\n**Permissions:** `IsNotAnonymousUser`",
         "parameters": [
           {
             "in": "path",
@@ -259,7 +259,7 @@
     "/calendar/api/v1/events/{event_id}/ics": {
       "get": {
         "operationId": "calendar_api_v1_events_ics_retrieve",
-        "description": "Export an event (series RRULE included) as an RFC 5545 .ics file.\n\n**Permissions:** `IsAuthenticated`",
+        "description": "Export an event (series RRULE included) as an RFC 5545 .ics file.\n\n**Permissions:** `IsNotAnonymousUser`",
         "parameters": [
           {
             "in": "path",
@@ -289,7 +289,7 @@
     "/calendar/api/v1/events/{event_id}/participants": {
       "put": {
         "operationId": "calendar_api_v1_events_participants_update",
-        "description": "Replace an event's participant set (replace-set semantics, owner-only).\n\n**Permissions:** `IsAuthenticated`",
+        "description": "Replace an event's participant set (replace-set semantics, owner-only).\n\n**Permissions:** `IsNotAnonymousUser`",
         "parameters": [
           {
             "in": "path",
@@ -345,7 +345,7 @@
     "/calendar/api/v1/events/{event_id}/respond": {
       "post": {
         "operationId": "calendar_api_v1_events_respond_create",
-        "description": "Record the requesting user's RSVP to an event.\n\n**Permissions:** `IsAuthenticated`",
+        "description": "Record the requesting user's RSVP to an event.\n\n**Permissions:** `IsNotAnonymousUser`",
         "parameters": [
           {
             "in": "path",

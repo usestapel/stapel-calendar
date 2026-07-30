@@ -4,6 +4,71 @@ All notable changes to stapel-calendar are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Pre-1.0 semver: **minor = breaking**, patch = compatible.
 
+## [0.4.0] — 2026-07-30
+
+### Every view says, in its own source, what a guest may do (#168)
+
+`stapel-core` 0.16 turns the `AUTH_ANONYMOUS` axis into a question this
+module never answered. A guest session is `is_authenticated`, so a bare
+`IsAuthenticated` gate lets it through — and all seven views here were gated
+on exactly that, saying nothing about whether that was wanted.
+`stapel_core.adoption` W002 reported all seven against a real deployment.
+
+The answer is drawn along the line this module's own filtering already draws:
+
+> **a guest may read the calendar it is in — which is none — and may not open
+> a single named event, nor write anything.**
+
+**Open, deliberately** (`stapel_anonymous_access = ANONYMOUS_ALLOWED`):
+
+- `GET /events`, `GET /calendar` — bounded by `_visible_events`, i.e. by the
+  `VISIBILITY` axis and the deployment's scope provider. A guest gets an
+  empty range, which is the truth. **This is a live guest path**: a real
+  consumer (meettoday) renders the guest's one and only page with
+  `GET /calendar/api/v1/events` on it, so closing it would have turned a
+  guest's landing page into an error in production.
+- `GET /availability` — computed strictly over `request.user`'s own
+  free/busy; a guest is reported entirely free, revealing nobody else's time.
+
+**Closed** (`IsNotAnonymousUser` — 403 where an anonymous session previously
+got through):
+
+- `GET /events/{id}` and `GET /events/{id}/ics` resolve through the scope
+  provider **only**, with no participation filter — so with the stock no-op
+  provider any authenticated caller can fetch any event by UUID. The
+  anonymous axis makes "authenticated" free to obtain, which turns that
+  looseness into an open door. Their mutating halves (`PATCH`/`DELETE`) are
+  owner-only and a guest owns nothing, so nothing is lost by closing the
+  views whole.
+- `PUT /events/{id}/participants` — an organizer action, and the organizer is
+  the owner.
+- `POST /events/{id}/respond` — an RSVP presupposes an invitation, and a
+  guest has no address to be invited at (this was already a 404
+  `not_invited`; now it is a refusal at the door).
+- `POST /events` is guarded inside the method, because the view's `GET` half
+  must stay reachable. An event is durable and owned; a series created under
+  a throwaway account keeps materializing occurrences long after the only
+  identity that could cancel it is gone.
+
+Minor per this project's pre-1.0 rule (minor = breaking): for a deployment
+with `AUTH_ANONYMOUS` on this changes live behaviour, and it is visible in
+the published contract — `docs/schema.json` now documents
+`IsNotAnonymousUser` on the four closed operations. Deployments without
+guest sessions are unaffected: an ordinary authenticated user passes
+`IsNotAnonymousUser` exactly as before.
+
+New `tests/test_guest_surface.py` pins both halves — what a guest must still
+reach, and what it must not.
+
+### Changed
+
+- Minimum `stapel-core` raised to `>=0.16` (the release that added
+  `ANONYMOUS_ALLOWED` / `ANONYMOUS_DENIED`).
+
+## [0.3.9] — 2026-07-30
+
+- Widen the `stapel-core` cap to `<1.0`.
+
 ## [0.3.8] — 2026-07-17
 
 Fix-up #2: 0.3.7's regen still baked the old version into

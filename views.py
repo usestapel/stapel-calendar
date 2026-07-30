@@ -3,6 +3,43 @@
 Thin views over :mod:`services`. Scope resolution/filtering goes through the
 ``SCOPE_PROVIDER`` seam so the host controls what ``scope_key`` an event gets
 and which events a request may see.
+
+Guest (anonymous session) stance
+--------------------------------
+With ``AUTH_ANONYMOUS`` on, a guest session is ``is_authenticated``, so a bare
+``IsAuthenticated`` says nothing about whether guests belong on a view
+(``stapel_core.adoption`` E001/W002). Every view here states its answer, and
+the rule is drawn along the line the module's own filtering already draws:
+
+    **a guest may read the calendar it is in — which is none — and may not
+    open a single named event, nor write anything.**
+
+*Reads bounded by* :func:`_visible_events` *stay open.* That helper applies
+the ``VISIBILITY`` axis and the scope provider, so what comes back is what
+the deployment already decided this caller may see; for a guest that is an
+empty range. This is not hypothetical politeness: a real consumer
+(meettoday) renders the guest's one and only page with
+``GET /calendar/api/v1/events`` in it, and a 403 there would break the guest
+landing page in production, not in review. ``EventListCreateView`` (GET),
+``CalendarView`` and ``AvailabilityView`` are therefore
+``ANONYMOUS_ALLOWED``.
+
+*Reads of one event by id do not stay open.* ``EventDetailView`` and
+``EventICSView`` resolve through the scope provider **only** — no
+participation filter — so with the stock no-op provider any authenticated
+caller can fetch any event by UUID. That was already loose; the anonymous
+axis makes it free, because minting an authenticated session no longer costs
+an account. They carry
+:class:`~stapel_core.django.api.permissions.IsNotAnonymousUser`.
+
+*Writes do not stay open.* An event is durable and owned, and an anonymous
+account is throwaway by construction — a series created under one outlives
+the only identity that could edit or cancel it. Creation is guarded inside
+``EventListCreateView.post`` (the view's GET half must stay reachable);
+``EventParticipantsView`` and ``EventRespondView`` carry
+``IsNotAnonymousUser``, which is also what they already meant: the first is
+owner-only and a guest owns nothing, the second requires being an invited
+participant and a guest has no address to be invited at.
 """
 from datetime import timedelta
 
@@ -12,7 +49,15 @@ from django.utils.dateparse import parse_datetime
 from drf_spectacular.utils import extend_schema
 from rest_framework import permissions, status
 from rest_framework.views import APIView
-from stapel_core.django.api.errors import StapelErrorResponse, StapelResponse
+from stapel_core.django.api.errors import (
+    StapelErrorResponse,
+    StapelResponse,
+    error_403_forbidden,
+)
+from stapel_core.django.api.permissions import (
+    ANONYMOUS_ALLOWED,
+    IsNotAnonymousUser,
+)
 
 from . import ics, services
 from .conf import calendar_settings
@@ -151,6 +196,11 @@ class EventListCreateView(SerializerSeamMixin, APIView):
     """List the requesting user's events in a range, or create an event."""
 
     permission_classes = [permissions.IsAuthenticated]
+    # GET is a live guest path: meettoday renders the guest's only page with
+    # this call in it. The range is bounded by `_visible_events`, so a guest
+    # gets its own — empty — window rather than a 403 the page would have to
+    # special-case. POST is the opposite answer and is guarded in `post`.
+    stapel_anonymous_access = ANONYMOUS_ALLOWED
     request_serializer_class = EventCreateRequestSerializer
     response_serializer_class = EventResponseSerializer
 
@@ -176,6 +226,15 @@ class EventListCreateView(SerializerSeamMixin, APIView):
         responses={201: EventResponseSerializer},
     )
     def post(self, request):  # noqa: R007
+        # The other half of this view's guest stance (see the class header).
+        # An event is durable and owned; `create_event` makes the caller its
+        # owner, and only the owner can ever edit or cancel it. An anonymous
+        # account cannot be logged back into, so a series created under one
+        # becomes unmaintainable the moment the session ends — and, with a
+        # scope provider that stamps a real tenant, it lands inside somebody's
+        # calendar with nobody able to take it back out.
+        if getattr(request.user, "is_anonymous", False):
+            return error_403_forbidden()
         ser = self.get_request_serializer_class()(data=request.data)
         ser.is_valid(raise_exception=True)
         data = ser.validated_data
@@ -209,7 +268,12 @@ class EventListCreateView(SerializerSeamMixin, APIView):
 class EventDetailView(SerializerSeamMixin, APIView):
     """Retrieve/update/delete a single event (mutations owner-only)."""
 
-    permission_classes = [permissions.IsAuthenticated]
+    # `_get` resolves through the scope provider ONLY — no participation
+    # filter — so with the stock no-op provider any authenticated caller can
+    # read any event by UUID. The anonymous axis makes "authenticated" free,
+    # which turns that looseness into an open door. Mutations are owner-only
+    # and a guest owns nothing, so nothing is lost by closing the whole view.
+    permission_classes = [IsNotAnonymousUser]
     request_serializer_class = EventUpdateRequestSerializer
     response_serializer_class = EventResponseSerializer
 
@@ -296,7 +360,10 @@ class EventDetailView(SerializerSeamMixin, APIView):
 class EventRespondView(SerializerSeamMixin, APIView):
     """Record the requesting user's RSVP to an event."""
 
-    permission_classes = [permissions.IsAuthenticated]
+    # An RSVP presupposes an invitation, and a guest has no address to be
+    # invited at — this was already a 404 `not_invited`, now it is a refusal
+    # at the door, stated where the class is read.
+    permission_classes = [IsNotAnonymousUser]
     request_serializer_class = RSVPRequestSerializer
     response_serializer_class = EventResponseSerializer
 
@@ -324,7 +391,9 @@ class EventRespondView(SerializerSeamMixin, APIView):
 class EventParticipantsView(SerializerSeamMixin, APIView):
     """Replace an event's participant set (replace-set semantics, owner-only)."""
 
-    permission_classes = [permissions.IsAuthenticated]
+    # Organizer action, and the organizer is the event owner — a guest owns
+    # no event, so this could only ever have returned 403/404 for one.
+    permission_classes = [IsNotAnonymousUser]
     request_serializer_class = ParticipantsReplaceRequestSerializer
     response_serializer_class = EventResponseSerializer
 
@@ -358,7 +427,9 @@ class EventParticipantsView(SerializerSeamMixin, APIView):
 class EventICSView(SerializerSeamMixin, APIView):
     """Export an event (series RRULE included) as an RFC 5545 .ics file."""
 
-    permission_classes = [permissions.IsAuthenticated]
+    # Same unfiltered by-id resolution as EventDetailView, in file form —
+    # closed for the same reason.
+    permission_classes = [IsNotAnonymousUser]
 
     def get(self, request, event_id):
         qs = get_scope_provider().filter(Event.objects.all(), request)
@@ -377,6 +448,10 @@ class CalendarView(SerializerSeamMixin, APIView):
     virtual+materialized occurrences of every series they're on."""
 
     permission_classes = [permissions.IsAuthenticated]
+    # Read bounded by `_visible_events`, exactly like the event list: whatever
+    # the deployment's VISIBILITY axis and scope provider already allow this
+    # caller — for a guest, an empty range.
+    stapel_anonymous_access = ANONYMOUS_ALLOWED
     response_serializer_class = CalendarResponseSerializer
 
     @extend_schema(responses={200: CalendarResponseSerializer})
@@ -412,6 +487,9 @@ class AvailabilityView(SerializerSeamMixin, APIView):
     """Free/busy + open booking slots for the requesting user over a range."""
 
     permission_classes = [permissions.IsAuthenticated]
+    # Computed strictly over `request.user`'s own free/busy — a guest's answer
+    # is "entirely free", which is true and reveals nobody else's time.
+    stapel_anonymous_access = ANONYMOUS_ALLOWED
     response_serializer_class = AvailabilityResponseSerializer
 
     @extend_schema(responses={200: AvailabilityResponseSerializer})
