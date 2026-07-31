@@ -42,7 +42,7 @@ package-dir = {"stapel_calendar" = "."}
 packages = ["stapel_calendar", "stapel_calendar.migrations"]
 
 [tool.setuptools.package-data]
-stapel_calendar = ["py.typed", "migrations/*.py", "schemas/**/*.json"]
+stapel_calendar = ["py.typed", "migrations/*.py", "schemas/**/*.json", "docs/capabilities.json", "docs/flows.json", "docs/errors.json", "CONFIG.MD"]
 
 [tool.ruff]
 target-version = "py311"
