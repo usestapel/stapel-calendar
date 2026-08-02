@@ -4,6 +4,19 @@ All notable changes to stapel-calendar are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Pre-1.0 semver: **minor = breaking**, patch = compatible.
 
+## [0.4.1] — 2026-08-02
+
+### Added
+- `docs/llms.txt` — the fifth contract artifact, an agent-sized slice of the
+  schema/flows/errors/capabilities triad, wired into `make contract` /
+  `make contract-check` (badge-canon §3).
+- Badge canon in README, classifier 3.14.
+
+### Fixed
+- `docs/capabilities.json`, `docs/flows.json`, `docs/errors.json`,
+  `docs/llms.txt` and `CONFIG.MD` now ship in the wheel via `package-data`
+  (#184); previously repo-only, invisible to `--from-installed` tooling.
+
 ## [0.4.0] — 2026-07-30
 
 ### Every view says, in its own source, what a guest may do (#168)
