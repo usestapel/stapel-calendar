@@ -1,8 +1,11 @@
 # stapel-calendar
 
-[![CI](https://github.com/usestapel/stapel-calendar/actions/workflows/ci.yml/badge.svg)](https://github.com/usestapel/stapel-calendar/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/usestapel/stapel-calendar/graph/badge.svg)](https://codecov.io/gh/usestapel/stapel-calendar)
-[![PyPI](https://img.shields.io/pypi/v/stapel-calendar.svg)](https://pypi.org/project/stapel-calendar/)
+[![CI](https://img.shields.io/github/actions/workflow/status/usestapel/stapel-calendar/ci.yml?branch=main&logo=github&label=CI)](https://github.com/usestapel/stapel-calendar/actions/workflows/ci.yml?query=branch%3Amain)
+[![coverage](https://img.shields.io/codecov/c/github/usestapel/stapel-calendar?branch=main&logo=codecov&label=coverage)](https://app.codecov.io/gh/usestapel/stapel-calendar)
+[![pypi](https://img.shields.io/pypi/v/stapel-calendar?logo=pypi&logoColor=white&label=pypi)](https://pypi.org/project/stapel-calendar/)
+[![downloads](https://static.pepy.tech/badge/stapel-calendar/month)](https://pepy.tech/project/stapel-calendar)
+[![python](https://img.shields.io/pypi/pyversions/stapel-calendar?logo=python&logoColor=white)](https://pypi.org/project/stapel-calendar/)
+[![license](https://img.shields.io/github/license/usestapel/stapel-calendar)](https://github.com/usestapel/stapel-calendar/blob/main/LICENSE)
 
 Calendar, recurrence and scheduling for the [Stapel framework](https://github.com/usestapel) —
 composable Django apps that deploy as a monolith or as microservices
