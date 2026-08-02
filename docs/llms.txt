@@ -1,0 +1,93 @@
+# stapel-calendar 0.4.0
+
+Calendar and scheduling: events with participants and RSVP, RFC 5545 recurring series (virtual expansion, on-demand materialization, per-instant cancellation and reschedule), availability windows with free/busy and bookable slot computation, ICS export, and event-driven reminders.
+
+Contract: axes 1 · extension points 5 · operations 10 · error codes 48.
+Generated from docs/capabilities.json by `stapel-llms-txt` — do not edit; drift-gated by `make contract-check`.
+
+## Configuration axes — what a product switches on
+Settings keys; `default` is what you get by saying nothing. Turning an axis off unmounts the operations it gates.
+- VISIBILITY [enum, default "participants"] — Who can see an event
+  Controls the read surface of every event. "participants" (default) shows an event only to the people invited to it — the private-calendar model. "scope" makes events visible to everyone in the same workspace/org/tenant (as resolved by the scope provider) — a shared team calendar. Values: participants, scope. It changes what listing, calendar and detail endpoints return, not which endpoints exist.
+
+## Extension points — what a product replaces, fork-free
+- PRESETS [merge_registry]
+  Add or override recurrence presets (dateutil rrule kwargs) merged over the built-ins (none/daily/weekdays/weekly/biweekly/monthly/custom); None removes a built-in.
+- REMINDER_POLICY [dotted_path]
+  Swap the reminder policy (when and what to remind) — the default emits one reminder_due event per configured offset; subclass to change cadence or channel decisions without forking.
+- SCOPE_PROVIDER [dotted_path]
+  Swap how the opaque scope_key (workspace/org/tenant) is resolved from the request and enforced on querysets — the default is a single global scope; a host may return the active workspace_id.
+- calendar.occurrence.materialized [comm_event]
+  The resource hook: when a recurring occurrence is materialized the engine emits this event (plus a Django signal) — the app layer subscribes to attach its resource (e.g. a video room) without any coupling in the engine.
+- serializer_seams [class_override]
+  Every view declares request/response serializer seams (SerializerSeamMixin) — subclass the view, override the attribute, remount the URL.
+
+## Fits with — fleet dependencies
+- stapel-auth (optional) — every endpoint requires an authenticated user (IsAuthenticated); stapel-auth is the shelf's session issuer — any stapel-core-compatible JWT issuer satisfies the check
+- stapel-core (required) — comm bus (occurrence.materialized / reminder_due emits, calendar.free_busy Function), JWT authentication, AppSettings config layer
+- stapel-notifications (optional) — delivers the calendar.event.reminder_due events the default reminder policy emits; reminders degrade to no-ops without a subscriber
+
+## HTTP operations (10) — call by operationId, never by a typed path
+Paths are relative to `/calendar/api/v1/`.
+### Calendar
+- GET /availability — calendar_api_v1_availability_retrieve
+- GET /calendar — calendar_api_v1_calendar_retrieve
+- POST /events — calendar_api_v1_events_create
+- DELETE /events/{event_id} — calendar_api_v1_events_destroy
+- GET /events/{event_id}/ics — calendar_api_v1_events_ics_retrieve
+- GET /events — calendar_api_v1_events_list
+- PATCH /events/{event_id} — calendar_api_v1_events_partial_update
+- PUT /events/{event_id}/participants — calendar_api_v1_events_participants_update
+- POST /events/{event_id}/respond — calendar_api_v1_events_respond_create
+- GET /events/{event_id} — calendar_api_v1_events_retrieve
+
+## Error codes (48) — the StapelError envelope
+Render `t(code, params)`; branch UX on the remediation. Localized text lives in docs/errors.<lang>.md, not here.
+- error.400.bad_request [400] fix_input
+- error.400.calendar_invalid_range [400] fix_input
+- error.400.calendar_invalid_recurrence [400] fix_input
+- error.400.calendar_invalid_rsvp [400] fix_input
+- error.400.calendar_invalid_slot_minutes [400] fix_input
+- error.400.captcha_invalid [400] retry
+- error.400.captcha_required [400] retry
+- error.400.expected_list [400] fix_input
+- error.400.field.blank [400] fix_input {field}
+- error.400.field.does_not_exist [400] fix_input {field}
+- error.400.field.invalid [400] fix_input {field}
+- error.400.field.invalid_choice [400] fix_input {field}
+- error.400.field.max_length [400] fix_input {field,max_length}
+- error.400.field.max_value [400] fix_input {field,max_value}
+- error.400.field.min_length [400] fix_input {field,min_length}
+- error.400.field.min_value [400] fix_input {field,min_value}
+- error.400.field.null [400] fix_input {field}
+- error.400.field.required [400] fix_input {field}
+- error.400.field.unique [400] fix_input {field}
+- error.400.invalid_ad_id [400] fix_input
+- error.400.validation_error [400] fix_input
+- error.400.verification_failed [400] verify
+- error.400.verification_invalid_factor [400] verify
+- error.401.unauthorized [401] reauthenticate
+- error.402.payment_required [402] retry
+- error.403.calendar_not_event_owner [403] retry
+- error.403.forbidden [403] retry
+- error.403.network_blocked [403] contact_support
+- error.403.verification_enrollment_required [403] verify
+- error.403.verification_required [403] verify
+- error.404.ad_not_found [404] retry
+- error.404.calendar_event_not_found [404] retry
+- error.404.calendar_not_invited [404] fix_input
+- error.404.not_found [404] retry
+- error.404.verification_challenge_not_found [404] verify
+- error.405.method_not_allowed [405] retry
+- error.406.not_acceptable [406] retry
+- error.408.request_timeout [408] retry
+- error.409.conflict [409] fix_input
+- error.410.gone [410] retry
+- error.413.payload_too_large [413] retry
+- error.415.unsupported_media_type [415] retry
+- error.422.unprocessable_entity [422] wait_and_retry
+- error.423.locked [423] wait_and_retry
+- error.423.verification_locked [423] wait_and_retry
+- error.429.rate_limit [429] wait_and_retry {retry_after_minutes}
+- error.429.too_many_requests [429] wait_and_retry
+- error.500.internal [500] contact_support

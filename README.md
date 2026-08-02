@@ -6,6 +6,7 @@
 [![downloads](https://static.pepy.tech/badge/stapel-calendar/month)](https://pepy.tech/project/stapel-calendar)
 [![python](https://img.shields.io/pypi/pyversions/stapel-calendar?logo=python&logoColor=white)](https://pypi.org/project/stapel-calendar/)
 [![license](https://img.shields.io/github/license/usestapel/stapel-calendar)](https://github.com/usestapel/stapel-calendar/blob/main/LICENSE)
+[![llms.txt](https://img.shields.io/badge/llms.txt-blue)](https://github.com/usestapel/stapel-calendar/blob/main/docs/llms.txt)
 
 Calendar, recurrence and scheduling for the [Stapel framework](https://github.com/usestapel) —
 composable Django apps that deploy as a monolith or as microservices
