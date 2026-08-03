@@ -77,7 +77,16 @@ TRIAD = ("schema.json", "flows.json", "errors.json")
 #
 # The fifth artifact: docs/llms.txt (badge-canon §3, stapel_tools.llms_txt) —
 # an agent-sized slice of capabilities.json (+ this triad), same discipline.
+#
+# The usage surface (stapel_tools.surface — the services/recurrence/ics/
+# reminders roots, 31 entries) does not fit the generator's default
+# 4000-token budget next to a 48-key error registry. Same exception
+# stapel-auth (8000) and stapel-workspaces (4500) already take: raise the
+# ceiling to 5000 for this module, do not shorten intent lines to fit — the
+# surface section is the part an agent reads to avoid rewriting a mechanism
+# that already exists. The budget stays enforced, just at 5000.
 ARTIFACTS = TRIAD + ("capabilities.json", "llms.txt")
+LLMS_TXT_BUDGET = "5000"
 
 
 def _emit(out_dir: Path) -> None:
@@ -89,7 +98,10 @@ def _emit(out_dir: Path) -> None:
             capture_output=True,
         )
     subprocess.run(
-        [sys.executable, "-m", "stapel_tools.llms_txt", ".", "--out", str(out_dir)],
+        [
+            sys.executable, "-m", "stapel_tools.llms_txt", ".",
+            "--out", str(out_dir), "--budget", LLMS_TXT_BUDGET,
+        ],
         cwd=str(REPO),
         check=True,
         capture_output=True,

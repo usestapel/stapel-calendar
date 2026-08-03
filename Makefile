@@ -16,10 +16,18 @@ PYTHON ?= python3
 # artifact docs/llms.txt (badge-canon §3, stapel_tools.llms_txt) — an
 # agent-sized slice of capabilities.json (+ schema/errors/flows), rendered
 # last so it always reflects this same run's triad + capabilities.json.
+#
+# --budget 5000: raised from the 4000 default when the `surface` section landed
+# (31 entries — the services/recurrence/ics/reminders roots), which alone costs
+# ~2.7k tokens next to a 48-key error registry. Raised deliberately rather than
+# by shortening the intent lines: the surface section is the one part of this
+# file an agent reads to avoid rewriting a mechanism that exists, and a
+# one-clause intent does not stop that (stapel-auth 8000, stapel-workspaces
+# 4500 are the fleet's other deliberate ceilings).
 contract:
 	$(PYTHON) -m stapel_calendar._codegen --out docs
 	$(PYTHON) -m stapel_calendar._capabilities --out docs
-	$(PYTHON) -m stapel_tools.llms_txt . --out docs
+	$(PYTHON) -m stapel_tools.llms_txt . --out docs --budget 5000
 
 # Drift gate: regenerate into a temp dir and diff against the committed docs/*
 # (mirrors the monolith's `make codegen-check` and the frontend's `gen:*:check`).
@@ -27,7 +35,7 @@ contract-check:
 	@tmp=$$(mktemp -d); \
 	$(PYTHON) -m stapel_calendar._codegen --out "$$tmp" || { rm -rf "$$tmp"; exit 1; }; \
 	$(PYTHON) -m stapel_calendar._capabilities --out "$$tmp" || { rm -rf "$$tmp"; exit 1; }; \
-	$(PYTHON) -m stapel_tools.llms_txt . --out "$$tmp" || { rm -rf "$$tmp"; exit 1; }; \
+	$(PYTHON) -m stapel_tools.llms_txt . --out "$$tmp" --budget 5000 || { rm -rf "$$tmp"; exit 1; }; \
 	rc=0; \
 	for f in schema.json flows.json errors.json capabilities.json llms.txt; do \
 		if ! diff -q "docs/$$f" "$$tmp/$$f" >/dev/null 2>&1; then \

@@ -46,6 +46,212 @@
       "summary": "Every view declares request/response serializer seams (SerializerSeamMixin) — subclass the view, override the attribute, remount the URL."
     }
   ],
+  "surface": [
+    {
+      "name": "event_to_vevent",
+      "kind": "factory",
+      "path": "stapel_calendar.ics.event_to_vevent",
+      "intent": "Serialize one event to its VEVENT lines (a series master carries its RRULE, a concrete event omits it) — the per-event grain, for assembling a VCALENDAR of your own shape. to_ics() is the whole-calendar wrapper."
+    },
+    {
+      "name": "parse_ics",
+      "kind": "factory",
+      "path": "stapel_calendar.ics.parse_ics",
+      "intent": "Read VEVENT blocks back into dicts (uid/summary/description/start/end/rrule/status). Deliberately minimal — enough for an export/import round-trip and a simple sync consumer; parsing arbitrary foreign calendars is still a job for a full iCalendar library."
+    },
+    {
+      "name": "to_ics",
+      "kind": "factory",
+      "path": "stapel_calendar.ics.to_ics",
+      "intent": "Wrap one event or an iterable of them in a VCALENDAR — how to ship an .ics subscription feed or attach an invite to an outgoing letter without adding an iCalendar dependency or hand-writing CRLF-folded output.",
+      "instead_of": [
+        "icalendar.Calendar"
+      ]
+    },
+    {
+      "name": "add_duration",
+      "kind": "factory",
+      "path": "stapel_calendar.recurrence.add_duration",
+      "intent": "start + duration in instant space rather than wall-clock. Use it for anything derived from an occurrence start: plain datetime addition across a spring-forward gap yields end < start, and across a fall-back fold it inflates the duration.",
+      "instead_of": [
+        "datetime.datetime.__add__"
+      ]
+    },
+    {
+      "name": "as_utc",
+      "kind": "factory",
+      "path": "stapel_calendar.recurrence.as_utc",
+      "intent": "Normalize an instant to UTC before comparing or keying it (a naive datetime passes through unchanged). Every occurrence comparison in the engine goes through this: PEP 495 makes == and hash of inter-zone aware datetimes disagree on DST gap/fold wall times, so a raw dict lookup misses precisely the occurrences that matter."
+    },
+    {
+      "name": "build_rrule",
+      "kind": "factory",
+      "path": "stapel_calendar.recurrence.build_rrule",
+      "intent": "Build the canonical RRULE string for a preset plus runtime params, with the RFC 5545 rules enforced at BUILD time: count and until are mutually exclusive, and a naive UNTIL against an aware start is refused here rather than 500-ing on every later expansion of the stored series. Instead of assembling an RRULE by hand or going to dateutil directly.",
+      "instead_of": [
+        "dateutil.rrule.rrule"
+      ]
+    },
+    {
+      "name": "expand_rule",
+      "kind": "factory",
+      "path": "stapel_calendar.recurrence.expand_rule",
+      "intent": "List-only expand_rule_detailed, with the same caveat as everywhere else here: availability math needs the truncated flag, a date preview does not.",
+      "instead_of": [
+        "dateutil.rrule.rrule.between"
+      ]
+    },
+    {
+      "name": "expand_rule_detailed",
+      "kind": "factory",
+      "path": "stapel_calendar.recurrence.expand_rule_detailed",
+      "intent": "Expand a bare RRULE over a range with no Event behind it — the preview path for a rule the user has not saved yet. Lazily iterated and capped at MAX_EXPANSION_OCCURRENCES with a truncated flag, so an unbounded rule over a wide range stays bounded work; dateutil's own between() would materialize the lot.",
+      "instead_of": [
+        "dateutil.rrule.rrule.between"
+      ]
+    },
+    {
+      "name": "get_presets",
+      "kind": "factory",
+      "path": "stapel_calendar.recurrence.get_presets",
+      "intent": "The effective preset map — built-ins merged with STAPEL_CALENDAR[\"PRESETS\"] and any runtime registration, names set to None removed. Read this to render a recurrence picker; merging BUILTIN_PRESETS with the setting yourself gets the removals wrong."
+    },
+    {
+      "name": "is_rule_instant",
+      "kind": "predicate",
+      "path": "stapel_calendar.recurrence.is_rule_instant",
+      "intent": "Is this datetime an actual instant of the rule, inside its UNTIL/COUNT bounds — compared in UTC space, so a DST-transition wall time still matches. Validate a requested occurrence start with this before materializing or booking it."
+    },
+    {
+      "name": "normalize_weekdays",
+      "kind": "factory",
+      "path": "stapel_calendar.recurrence.normalize_weekdays",
+      "intent": "Coerce a CSV string or an iterable into a sorted, unique, range-checked list of 0=Mon..6=Sun ints — the one place weekday input is validated (out of range raises InvalidRecurrence). Reach for it when importing legacy recurrence_days data instead of splitting the string yourself."
+    },
+    {
+      "name": "parse_rrule",
+      "kind": "factory",
+      "path": "stapel_calendar.recurrence.parse_rrule",
+      "intent": "Parse a stored canonical rule anchored at its DTSTART, converting dateutil's ValueError/TypeError into InvalidRecurrence — so a bad stored rule surfaces as this module's error class and not as a 500 from a third-party parser.",
+      "instead_of": [
+        "dateutil.rrule.rrulestr"
+      ]
+    },
+    {
+      "name": "register_preset",
+      "kind": "factory",
+      "path": "stapel_calendar.recurrence.register_preset",
+      "intent": "Register or override a recurrence preset at runtime (a dict of dateutil.rrule kwargs; None removes a built-in) — the code-side half of the PRESETS seam, for a module or an AppConfig.ready() that cannot go through settings."
+    },
+    {
+      "name": "reset_presets",
+      "kind": "factory",
+      "path": "stapel_calendar.recurrence.reset_presets",
+      "intent": "Tests only: drop the runtime preset overrides. The registry is process-global, so a test that calls register_preset must reset it in teardown or leak into every later test — do that here instead of reaching into the private registry dict."
+    },
+    {
+      "name": "rrule_inputs",
+      "kind": "factory",
+      "path": "stapel_calendar.recurrence.rrule_inputs",
+      "intent": "Recover the recurrence params (interval / weekdays / until / count) from a stored canonical RRULE — the inverse of build_rrule. The library persists only the rule string, so anything that has to show or partially edit \"every 2 weeks until March\" must call this instead of parsing the RRULE itself."
+    },
+    {
+      "name": "get_reminder_policy",
+      "kind": "factory",
+      "path": "stapel_calendar.reminders.get_reminder_policy",
+      "intent": "The configured ReminderPolicy instance, already resolved from the REMINDER_POLICY seam. Reach for it only to drive the policy for a single event outside the cron scan — an admin \"remind now\" action — and never to read the setting yourself; the periodic path is run_reminders."
+    },
+    {
+      "name": "run_reminders",
+      "kind": "factory",
+      "path": "stapel_calendar.reminders.run_reminders",
+      "intent": "The reminder entry point a host cron must call on a schedule (once per REMINDER_SCAN_WINDOW_SECONDS): it scans concrete upcoming events, asks the configured policy what is due, emits calendar.event.reminder_due and returns how many. This module ships NO scheduler — nothing here fires on its own, and a deployment that never wires this gets no reminders and no error."
+    },
+    {
+      "name": "cancel_occurrence",
+      "kind": "factory",
+      "path": "stapel_calendar.services.cancel_occurrence",
+      "intent": "Cancel a single instant of a series — the RFC 5545 EXDATE analog — by tombstoning it. Use this and never a hard delete of the occurrence row: deleting lets the virtual occurrence at that instant resurrect, and the slot goes busy again."
+    },
+    {
+      "name": "compute_slots",
+      "kind": "factory",
+      "path": "stapel_calendar.services.compute_slots",
+      "intent": "List-only compute_slots_detailed — good for a preview. A real booking flow wants the detailed variant: a slot computed from a truncated expansion may collide with an occurrence nobody computed."
+    },
+    {
+      "name": "compute_slots_detailed",
+      "kind": "factory",
+      "path": "stapel_calendar.services.compute_slots_detailed",
+      "intent": "Bookable slots for a user: their availability windows inside the range, minus busy time, chunked into fixed blocks — the booking primitive a scheduling product should call instead of writing its own slot cutter. Days are iterated in each window's OWN timezone (deriving them from the range's zone drops a window on the edge of the range), and truncated must be honoured before a slot is offered."
+    },
+    {
+      "name": "create_event",
+      "kind": "factory",
+      "path": "stapel_calendar.services.create_event",
+      "intent": "Create an event — or a series master — the way the engine expects: end >= start validated, the canonical RRULE derived from a preset, and the owner seeded as an ACCEPTED participant in the same batch as the invitees. Call this rather than Event.objects.create(): a hand-built row carries no owner participant, so it is invisible to free/busy and to its own owner's calendar."
+    },
+    {
+      "name": "expand_event",
+      "kind": "factory",
+      "path": "stapel_calendar.services.expand_event",
+      "intent": "List-only expand_event_detailed, for display code that does no availability math. If you are deciding whether something can be booked, take the detailed variant and honour truncated."
+    },
+    {
+      "name": "expand_event_detailed",
+      "kind": "factory",
+      "path": "stapel_calendar.services.expand_event_detailed",
+      "intent": "The occurrences of a series over a range, persisting nothing — materialized instants report their concrete id and actual (possibly rescheduled) times, cancelled ones are omitted. The read primitive behind any calendar view; its truncated flag means the MAX_EXPANSION_OCCURRENCES cap was hit and everything past it merely looks free."
+    },
+    {
+      "name": "free_busy",
+      "kind": "factory",
+      "path": "stapel_calendar.services.free_busy",
+      "intent": "List-only free_busy_detailed. Do not base a booking decision on it: it drops the truncated flag, and a truncated expansion makes the tail of the range look free."
+    },
+    {
+      "name": "free_busy_detailed",
+      "kind": "factory",
+      "path": "stapel_calendar.services.free_busy_detailed",
+      "intent": "Busy intervals for a user over a range: concrete events plus the virtual occurrences of every series they are on, without double-counting the materialized ones, minus cancelled and declined ones, merged and clipped to the range. This is the in-process entry point behind the calendar.free_busy comm Function — call it directly in a monolith, call the Function across services."
+    },
+    {
+      "name": "materialize",
+      "kind": "factory",
+      "path": "stapel_calendar.services.materialize",
+      "intent": "Persist one occurrence of a series so it can carry its own state, and fire calendar.occurrence.materialized for whoever attaches the resource. Idempotent and race-safe under concurrent booking; an off-rule instant is refused unless you pass off_rule=True. Creating the child row yourself produces a ghost occurrence — counted busy, invisible to expansion — and no resource hook."
+    },
+    {
+      "name": "merge_intervals",
+      "kind": "factory",
+      "path": "stapel_calendar.services.merge_intervals",
+      "intent": "Sort and coalesce overlapping or adjacent intervals, dropping degenerate ones — the general-purpose sweep every availability answer here is built on. Reach for it instead of writing one more merge loop; mishandling zero-length and inverted intervals is what shifts a slot grid."
+    },
+    {
+      "name": "replace_participants",
+      "kind": "factory",
+      "path": "stapel_calendar.services.replace_participants",
+      "intent": "Replace an event's guest list with PUT semantics: the owner is always retained as ACCEPTED, ids already on the event KEEP their existing RSVP, new ids arrive INVITED, dropped ids are deleted. Idempotent — reach for it instead of diffing participant rows yourself, where the classic bug is a re-sent list silently resetting an accepted invite back to invited."
+    },
+    {
+      "name": "respond",
+      "kind": "factory",
+      "path": "stapel_calendar.services.respond",
+      "intent": "Record a participant's RSVP — the backing call of POST /events/{id}/respond, for programmatic answers (a bot accepting on a user's behalf, a data migration). Instead of assigning Participant.rsvp, which skips the updated_at bump and the never-invited check."
+    },
+    {
+      "name": "subtract_intervals",
+      "kind": "factory",
+      "path": "stapel_calendar.services.subtract_intervals",
+      "intent": "The parts of a window not covered by a list of busy intervals — the other half of the availability algebra, paired with merge_intervals. Call it instead of hand-rolling overlap subtraction."
+    },
+    {
+      "name": "update_event",
+      "kind": "factory",
+      "path": "stapel_calendar.services.update_event",
+      "intent": "The safe edit path for an event or a series master: partial field update plus, when a recurrence input or the DTSTART anchor moves, a rule rebuild with every materialized occurrence reconciled against the new rule (still-valid instants kept, orphaned tombstones deleted, orphaned real occurrences detached into standalone events). Assigning rrule/start on the model leaves children claiming instants their series no longer has, and silently drops a bounded series' UNTIL."
+    }
+  ],
   "operations_total": 10,
   "requires": [
     {
