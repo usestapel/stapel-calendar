@@ -24,10 +24,17 @@ PYTHON ?= python3
 # file an agent reads to avoid rewriting a mechanism that exists, and a
 # one-clause intent does not stop that (stapel-auth 8000, stapel-workspaces
 # 4500 are the fleet's other deliberate ceilings).
+#
+# README.md is the SIXTH artifact (tracker #257): assembled by
+# stapel_tools.readme from docs/readme.md (the human half — what this module
+# is, how to think about it) plus everything emitted above. Badges, version,
+# surface counts and doc links are generated, so a release cannot leave them
+# behind. Edit docs/readme.md; never README.md.
 contract:
 	$(PYTHON) -m stapel_calendar._codegen --out docs
 	$(PYTHON) -m stapel_calendar._capabilities --out docs
 	$(PYTHON) -m stapel_tools.llms_txt . --out docs --budget 5000
+	$(PYTHON) -m stapel_tools.readme .
 
 # Drift gate: regenerate into a temp dir and diff against the committed docs/*
 # (mirrors the monolith's `make codegen-check` and the frontend's `gen:*:check`).
@@ -44,7 +51,8 @@ contract-check:
 		fi; \
 	done; \
 	rm -rf "$$tmp"; \
-	if [ $$rc -eq 0 ]; then echo "contract-check: docs/{schema,flows,errors,capabilities,llms.txt} up to date"; fi; \
+	$(PYTHON) -m stapel_tools.readme . --check || rc=1; \
+	if [ $$rc -eq 0 ]; then echo "contract-check: docs/{schema,flows,errors,capabilities,llms.txt} + README.md up to date"; fi; \
 	exit $$rc
 
 
