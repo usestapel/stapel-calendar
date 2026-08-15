@@ -205,13 +205,15 @@ class TestGuestCannotWrite:
 
 
 def test_closed_views_carry_the_permission_class():
-    for view in (
-        views.EventDetailView,
-        views.EventICSView,
-        views.EventParticipantsView,
-        views.EventRespondView,
-    ):
+    """Two closed for anonymity alone (owner-only / invitee-only downstream),
+    two closed for the third state as well — see tests/test_mandate_surface.py
+    for why ``IsNotAnonymousUser`` was not enough on the by-id reads."""
+    from stapel_core.django.api.permissions import HasWorkspaceMandateIfScoped
+
+    for view in (views.EventParticipantsView, views.EventRespondView):
         assert IsNotAnonymousUser in view.permission_classes, view.__name__
+    for view in (views.EventDetailView, views.EventICSView):
+        assert HasWorkspaceMandateIfScoped in view.permission_classes, view.__name__
 
 
 def test_no_view_is_left_silent():

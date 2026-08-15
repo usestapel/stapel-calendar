@@ -133,7 +133,7 @@
     "/calendar/api/v1/events/{event_id}": {
       "get": {
         "operationId": "calendar_api_v1_events_retrieve",
-        "description": "Retrieve/update/delete a single event (mutations owner-only).\n\n**Permissions:** `IsNotAnonymousUser`",
+        "description": "Retrieve/update/delete a single event (mutations owner-only).\n\n**Permissions:** `HasWorkspaceMandateIfScoped`",
         "parameters": [
           {
             "in": "path",
@@ -168,7 +168,7 @@
       },
       "patch": {
         "operationId": "calendar_api_v1_events_partial_update",
-        "description": "Retrieve/update/delete a single event (mutations owner-only).\n\n**Permissions:** `IsNotAnonymousUser`",
+        "description": "Retrieve/update/delete a single event (mutations owner-only).\n\n**Permissions:** `HasWorkspaceMandateIfScoped`",
         "parameters": [
           {
             "in": "path",
@@ -222,7 +222,7 @@
       },
       "delete": {
         "operationId": "calendar_api_v1_events_destroy",
-        "description": "Retrieve/update/delete a single event (mutations owner-only).\n\n**Permissions:** `IsNotAnonymousUser`",
+        "description": "Retrieve/update/delete a single event (mutations owner-only).\n\n**Permissions:** `HasWorkspaceMandateIfScoped`",
         "parameters": [
           {
             "in": "path",
@@ -259,7 +259,7 @@
     "/calendar/api/v1/events/{event_id}/ics": {
       "get": {
         "operationId": "calendar_api_v1_events_ics_retrieve",
-        "description": "Export an event (series RRULE included) as an RFC 5545 .ics file.\n\n**Permissions:** `IsNotAnonymousUser`",
+        "description": "Export an event (series RRULE included) as an RFC 5545 .ics file.\n\n**Permissions:** `HasWorkspaceMandateIfScoped`",
         "parameters": [
           {
             "in": "path",

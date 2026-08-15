@@ -30,7 +30,7 @@ pip install stapel-calendar
 | Config axes | 1 |
 | Usage surface | 31 |
 | Extension points | 5 |
-| Error codes | 48 |
+| Error codes | 49 |
 | Fleet dependencies | [`stapel-auth`](https://github.com/usestapel/stapel-auth) (optional) · [`stapel-core`](https://github.com/usestapel/stapel-core) · [`stapel-notifications`](https://github.com/usestapel/stapel-notifications) (optional) |
 
 ## Documentation

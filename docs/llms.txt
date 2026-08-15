@@ -2,7 +2,7 @@
 
 Calendar and scheduling: events with participants and RSVP, RFC 5545 recurring series (virtual expansion, on-demand materialization, per-instant cancellation and reschedule), availability windows with free/busy and bookable slot computation, ICS export, and event-driven reminders.
 
-Contract: axes 1 · surface 31 · extension points 5 · operations 10 · error codes 48.
+Contract: axes 1 · surface 31 · extension points 5 · operations 10 · error codes 49.
 Generated from docs/capabilities.json by `stapel-llms-txt` — do not edit; drift-gated by `make contract-check`.
 
 ## Configuration axes — what a product switches on
@@ -114,7 +114,7 @@ Paths are relative to `/calendar/api/v1/`.
 - POST /events/{event_id}/respond — calendar_api_v1_events_respond_create
 - GET /events/{event_id} — calendar_api_v1_events_retrieve
 
-## Error codes (48) — the StapelError envelope
+## Error codes (49) — the StapelError envelope
 Render `t(code, params)`; branch UX on the remediation. Localized text lives in docs/errors.<lang>.md, not here.
 - error.400.bad_request [400] fix_input
 - error.400.calendar_invalid_range [400] fix_input
@@ -164,3 +164,4 @@ Render `t(code, params)`; branch UX on the remediation. Localized text lives in 
 - error.429.rate_limit [429] wait_and_retry {retry_after_minutes}
 - error.429.too_many_requests [429] wait_and_retry
 - error.500.internal [500] contact_support
+- error.503.mandate_unavailable [503] retry

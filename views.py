@@ -29,8 +29,14 @@ landing page in production, not in review. ``EventListCreateView`` (GET),
 participation filter — so with the stock no-op provider any authenticated
 caller can fetch any event by UUID. That was already loose; the anonymous
 axis makes it free, because minting an authenticated session no longer costs
-an account. They carry
-:class:`~stapel_core.django.api.permissions.IsNotAnonymousUser`.
+an account. The first fix reached for
+:class:`~stapel_core.django.api.permissions.IsNotAnonymousUser` because the
+vocabulary had two words, and that class admits every real account —
+including one that belongs to no workspace anywhere. They now carry
+:class:`~stapel_core.django.api.permissions.HasWorkspaceMandateIfScoped`,
+the only gate of the four that asks the third question — and the variant a
+LIBRARY view needs, so a genuinely single-tenant host (where no mandate
+exists to hold) keeps working instead of answering 503 to everyone.
 
 *Writes do not stay open.* An event is durable and owned, and an anonymous
 account is throwaway by construction — a series created under one outlives
@@ -56,6 +62,7 @@ from stapel_core.django.api.errors import (
 )
 from stapel_core.django.api.permissions import (
     ANONYMOUS_ALLOWED,
+    HasWorkspaceMandateIfScoped,
     IsNotAnonymousUser,
 )
 
@@ -269,11 +276,11 @@ class EventDetailView(SerializerSeamMixin, APIView):
     """Retrieve/update/delete a single event (mutations owner-only)."""
 
     # `_get` resolves through the scope provider ONLY — no participation
-    # filter — so with the stock no-op provider any authenticated caller can
-    # read any event by UUID. The anonymous axis makes "authenticated" free,
-    # which turns that looseness into an open door. Mutations are owner-only
-    # and a guest owns nothing, so nothing is lost by closing the whole view.
-    permission_classes = [IsNotAnonymousUser]
+    # filter — so any caller the gate admits reads any event by UUID.
+    # `IsNotAnonymousUser` admits every real account, mandate or not; the
+    # mandate gate is the one that matches what this view exposes. Mutations
+    # are owner-only, so nothing is lost by closing the whole view.
+    permission_classes = [HasWorkspaceMandateIfScoped]
     request_serializer_class = EventUpdateRequestSerializer
     response_serializer_class = EventResponseSerializer
 
@@ -428,8 +435,8 @@ class EventICSView(SerializerSeamMixin, APIView):
     """Export an event (series RRULE included) as an RFC 5545 .ics file."""
 
     # Same unfiltered by-id resolution as EventDetailView, in file form —
-    # closed for the same reason.
-    permission_classes = [IsNotAnonymousUser]
+    # closed for the same reason, with the same gate.
+    permission_classes = [HasWorkspaceMandateIfScoped]
 
     def get(self, request, event_id):
         qs = get_scope_provider().filter(Event.objects.all(), request)
