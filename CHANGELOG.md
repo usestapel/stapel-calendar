@@ -4,6 +4,39 @@ All notable changes to stapel-calendar are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Pre-1.0 semver: **minor = breaking**, patch = compatible.
 
+## [0.5.0] — 2026-08-16
+
+### Security — the by-id reads need a mandate, not merely a real account
+
+`EventDetailView` and `EventICSView` resolve through the scope provider only,
+with no participation filter, so any caller the gate admits can read any event
+by UUID. 0.4.x closed the anonymous axis with `IsNotAnonymousUser` because the
+vocabulary had two words — but that class admits every real account, including
+one belonging to no workspace anywhere, and minting an account is cheap.
+
+Both now carry `HasWorkspaceMandateIfScoped`: the gate that asks the third
+question, in the variant a *library* view needs, so a genuinely single-tenant
+host — where no mandate exists to hold — keeps working instead of answering
+503 to everyone. Mutations were already owner-only, so nothing is lost by
+closing the whole view.
+
+**Breaking** (pre-1.0: minor = breaking): in a workspace-bearing deployment, an
+account with no mandate anywhere can no longer fetch an event by UUID or export
+its `.ics`. The declared permission changed on four published operations.
+
+### Changed — `stapel-core` floor raised to 0.27.0
+
+`HasWorkspaceMandateIfScoped` exists only in 0.27.0, which also owns
+`error.503.mandate_unavailable` in the committed `docs/errors.json`.
+
+## [0.4.2] — 2026-08-15
+
+### Changed — `stapel-core` floor raised to 0.26.0
+
+`docs/errors.json` carries an `owner` per entry, and only stapel-core 0.26.0
+emits it, so an older core regenerated the artifact without `owner` and the
+drift gate went red.
+
 ## [0.4.1] — 2026-08-02
 
 ### Added

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-calendar"
-version = "0.4.2"
+version = "0.5.0"
 description = "Calendar and scheduling for the Stapel framework"
 readme = "README.md"
 license = { text = "MIT" }
@@ -24,9 +24,10 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    # Floor: 0.26.0 emits docs/errors.json with the `owner` field the
-    # committed artifact and its drift gate require.
-    "stapel-core>=0.26.0,<1.0",
+    # Floor: 0.27.0 ships HasWorkspaceMandateIfScoped — the gate the by-id
+    # event reads carry — and owns error.503.mandate_unavailable in the
+    # committed errors.json. (The `owner` field arrived in 0.26.0.)
+    "stapel-core>=0.27.0,<1.0",
     "python-dateutil>=2.8,<3",
 ]
 
