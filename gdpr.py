@@ -1,17 +1,19 @@
-"""GDPR data handler for stapel-calendar.
+"""The Art. 15 export, and the registry seam onto the Art. 17 erasure.
 
-This module holds user PII: ``Event.owner``, ``Participant.user`` and
-``AvailabilityWindow.user``. Per the Stapel standard, a data-holding module
-subscribes to ``user.deleted`` and erases/anonymizes that data.
+The erasure itself is not here: it lives in :mod:`stapel_calendar.erasure`,
+as one function the in-process registry (below) and the comm subscribers
+registered in ``apps.ready()`` both reach. Two callers, one implementation —
+a monolith and a fleet erase the same rows the same way, and there is no
+second erasure to drift.
 
-- Owned events are hard-deleted (cascading to their occurrences and
-  participant rows). A calendar event carries no third-party PII worth
-  retaining, so deletion — not anonymization — is correct.
-- The user's participations in *other* people's events are removed (their
-  attendance is their PII), leaving those events intact for their owners.
-- The user's availability windows are deleted.
+What is erased: owned events are hard-deleted (cascading to their
+occurrences and participant rows), the subject's participations in *other*
+people's events are removed (their attendance is their PII, the event is not
+theirs), and their availability windows go.
 """
 from stapel_core.gdpr import GDPRProvider
+
+from .erasure import erase_subject
 
 
 class CalendarGDPRProvider(GDPRProvider):
@@ -42,13 +44,16 @@ class CalendarGDPRProvider(GDPRProvider):
         }
 
     def delete(self, user_id) -> None:
-        from .models import AvailabilityWindow, Event, Participant
+        """Erase the subject — the same operation the comm path runs.
 
-        # Owned events cascade to their occurrences + participant rows.
-        Event.objects.filter(owner_id=user_id).delete()
-        # Attendance in other users' events is this user's PII — remove it.
-        Participant.objects.filter(user_id=user_id).delete()
-        AvailabilityWindow.objects.filter(user_id=user_id).delete()
+        The registry reaches the erasure here; the
+        ``gdpr.erasure.requested`` subscriber registered in ``apps.ready()``
+        reaches it there. A host that runs both in one process erases once:
+        whichever path arrives second finds nothing left and receipts its
+        zeroes, and this one receipts nothing at all — the orchestrator
+        records the local pass itself.
+        """
+        erase_subject("account", user_id)
 
     def anonymize(self, user_id) -> None:
         # Calendar rows carry no content that must be retained after deletion.

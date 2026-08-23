@@ -1,7 +1,10 @@
-"""GDPR: user.deleted consumer erases the module's PII, schema-validated."""
+"""GDPR: the Art. 15 export and the provider seam onto the erasure.
+
+The erasure protocol itself — probe, receipt, idempotence — lives in
+``test_gdpr_owner.py``, beside the one function both callers reach.
+"""
 import json
 import pathlib
-import types
 import uuid
 from datetime import datetime, time
 from zoneinfo import ZoneInfo
@@ -86,27 +89,6 @@ class TestGDPRProvider:
 
     def test_anonymize_is_noop(self, user):
         assert CalendarGDPRProvider().anonymize(user.id) is None
-
-
-@pytest.mark.django_db
-class TestUserDeletedAction:
-    def test_handler_erases(self, user):
-        from stapel_calendar.actions import handle_user_deleted
-
-        _event(user)
-        handle_user_deleted(
-            types.SimpleNamespace(
-                payload={"user_id": str(user.id)}, event_id="evt-1"
-            )
-        )
-        assert not Event.objects.filter(owner_id=user.id).exists()
-
-    def test_handler_without_user_id_logs_and_returns(self, caplog):
-        from stapel_calendar.actions import handle_user_deleted
-
-        with caplog.at_level("ERROR", logger="stapel_calendar.actions"):
-            handle_user_deleted(types.SimpleNamespace(payload={}, event_id="evt-2"))
-        assert any("without user_id" in r.message for r in caplog.records)
 
 
 class TestConsumesSchema:

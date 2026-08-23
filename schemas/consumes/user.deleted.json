@@ -1,14 +1,31 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "user.deleted",
-  "description": "An account deletion was executed. stapel-calendar erases the user's owned events (and their occurrences/participants), participations and availability windows.",
+  "description": "DEPRECATED account erasure signal. stapel-gdpr emits it alongside gdpr.erasure.requested for account subjects until its 0.6.0; since 0.6.0 this module consumes both through stapel_core.gdpr.register_gdpr_owner and routes them through one erase call (stapel_calendar.erasure.erase_subject), so the handler can be deleted without deleting any erasure logic. It receipts gdpr.section.erased only when the payload carried a correlation_id.",
   "type": "object",
-  "required": ["user_id"],
+  "required": [
+    "user_id"
+  ],
   "properties": {
-    "user_id":        { "type": "string", "format": "uuid" },
-    "correlation_id": { "type": "string", "format": "uuid" },
-    "trigger":        { "type": "string", "enum": ["manual", "inactivity", "platform"] },
-    "deleted_at":     { "type": "string", "format": "date-time" }
+    "user_id": {
+      "type": "string"
+    },
+    "correlation_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "trigger": {
+      "type": "string",
+      "enum": [
+        "manual",
+        "inactivity",
+        "platform"
+      ]
+    },
+    "deleted_at": {
+      "type": "string",
+      "format": "date-time"
+    }
   },
   "additionalProperties": true
 }

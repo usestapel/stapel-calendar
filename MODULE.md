@@ -136,7 +136,50 @@ event to its invitees; `scope` opens events to the whole scope the
 |---|---|---|---|
 | Emit | `calendar.occurrence.materialized` | `{event_id, series_id, scope_key, owner_id, title, start, end}` | `schemas/emits/calendar.occurrence.materialized.json` |
 | Emit | `calendar.event.reminder_due` | `{event_id, scope_key, owner_id, title, start, offset_minutes, participant_ids, dedup_key}` | `schemas/emits/calendar.event.reminder_due.json` |
+| Consume | `gdpr.erasure.requested` | `{request_id, correlation_id, subject_type, subject_key, workspace_id?}` | `schemas/consumes/gdpr.erasure.requested.json` |
+| Consume | `gdpr.owner.probe` | `{correlation_id}` | `schemas/consumes/gdpr.owner.probe.json` |
+| Consume | `user.deleted` (deprecated) | `{user_id, correlation_id?}` | `schemas/consumes/user.deleted.json` |
+| Emit | `gdpr.section.erased` | `{owner, subject_type, subject_key, correlation_id, receipt_id, counts}` | `schemas/emits/gdpr.section.erased.json` |
+| Emit | `gdpr.owner.alive` | `{owner, subject_types, correlation_id}` | `schemas/emits/gdpr.owner.alive.json` |
 | Function (provides) | `calendar.free_busy` | `{user_id, start, end, scope_key?}` -> `{busy: [{start, end}], truncated}` | `schemas/functions/calendar.free_busy.json` |
+
+### Erasure (GDPR Art. 17) — this module is a data owner
+
+`stapel_calendar.erasure.erase_subject(subject_type, subject_key,
+workspace_id=None)` is the whole erasure, and everything else is a caller:
+
+| Caller | Reached how |
+|---|---|
+| `CalendarGDPRProvider.delete()` | the in-process registry the orchestrator walks in a monolith |
+| `gdpr.erasure.requested` subscriber | `stapel_core.gdpr.register_gdpr_owner("calendar", ["account"], erase_subject)` in `apps.ready()` |
+| `gdpr.owner.probe` subscriber | same registration — it answers `gdpr.owner.alive {owner: "calendar", subject_types: ["account"]}` |
+| `user.deleted` subscriber | same registration (deprecated; stapel-gdpr drops it in 0.6.0) |
+
+The protocol is **not** written here: core owns the deterministic
+`receipt_id`, the receipt inside the erase's transaction, the silence for an
+unclaimed subject and the logged drop for a malformed payload. This library
+owns only what is its own — the rows, idempotently, counted.
+
+**Owner name** `calendar` (= `CalendarGDPRProvider.section`; a host lists it
+in `STAPEL_GDPR["DATA_OWNERS"]`). **Subject types** `["account"]` only:
+every row hangs off one user id, and `scope_key` is an opaque string a
+host's provider computes, not a workspace id a `workspace` erasure could
+match on — claiming that type would mint a receipt for work nobody could
+have done.
+
+**Counts** `{events, participations, availability_windows}`. Owned events
+are hard-deleted (cascading to their occurrences and to every participant
+row on them); the subject's participations in *other* people's events are
+removed, leaving those events intact for their owners; availability windows
+go. Nothing is anonymized: an event stripped of who called it is not a
+record anybody keeps.
+
+**Why the probe matters.** Before 0.6.0 this module registered a
+`GDPRProvider` and shipped no probe subscriber, so an owners-health board
+reported `calendar: alive=false` forever and a fleet's erasure waited on
+this owner until it timed out — while the monolith path erased perfectly
+well. Liveness is answered by the subscriber that erases or it is evidence
+of nothing.
 
 ### API contract notes
 

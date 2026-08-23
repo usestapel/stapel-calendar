@@ -2,24 +2,18 @@
 
 Handlers must be idempotent: delivery is at-least-once (outbox retries,
 broker redelivery). Consumes contracts live in ``schemas/consumes/``.
+
+This module currently subscribes nothing. The GDPR erasure protocol used to
+live here as a hand-rolled ``user.deleted`` handler; since 0.6.0 the module
+registers as a stapel-gdpr data owner from ``apps.ready()`` and
+:func:`stapel_core.gdpr.register_gdpr_owner` subscribes all three actions —
+``gdpr.erasure.requested`` (erase + receipt), ``gdpr.owner.probe``
+(``gdpr.owner.alive`` answered from the SAME subscriber, which is what makes
+the answer evidence that the erasure path is consumed) and the deprecated
+``user.deleted``. All three run
+:func:`stapel_calendar.erasure.erase_subject`; a second handler for
+``user.deleted`` here would be a second erasure to keep in step.
+
+The module stays because it is where this library's consumes belong, and the
+next one should land beside that history rather than in a new file.
 """
-import logging
-
-from stapel_core.comm import on_action
-
-logger = logging.getLogger(__name__)
-
-
-@on_action("user.deleted")
-def handle_user_deleted(event):
-    """Erase this module's PII when an account deletion is executed:
-    the user's owned events (and their occurrences/participants), their
-    participations in other events, and their availability windows."""
-    from .gdpr import CalendarGDPRProvider
-
-    user_id = event.payload.get("user_id")
-    if not user_id:
-        logger.error("user.deleted event without user_id: %s", event.event_id)
-        return
-    CalendarGDPRProvider().delete(user_id)
-    logger.info("calendar data erased for deleted user %s", user_id)

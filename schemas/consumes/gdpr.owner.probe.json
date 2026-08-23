@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "gdpr.owner.probe",
+  "description": "Daily liveness probe from stapel-gdpr. Answered with gdpr.owner.alive from the same subscriber that handles gdpr.erasure.requested — until 0.6.0 stapel-calendar answered no probe at all, so a fleet's owners-health reported `calendar: alive=false` and its erasures waited on this owner forever while the in-process provider erased fine. Documentation of what is consumed: the authoritative schema is the emitter's, in stapel-gdpr/schemas/emits/.",
+  "type": "object",
+  "required": [
+    "correlation_id"
+  ],
+  "properties": {
+    "correlation_id": {
+      "type": "string",
+      "format": "uuid"
+    }
+  },
+  "additionalProperties": false
+}
