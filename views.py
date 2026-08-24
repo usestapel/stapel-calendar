@@ -52,7 +52,8 @@ from datetime import timedelta
 from django.http import HttpResponse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import permissions, status
 from rest_framework.views import APIView
 from stapel_core.django.api.errors import (
@@ -153,6 +154,48 @@ def occurrence_to_dto(occ) -> OccurrenceResponse:
     )
 
 
+#: The range every calendar read is asked over, declared for the schema.
+#:
+#: These views are plain ``APIView``s reading ``request.query_params`` by
+#: hand, so drf-spectacular has no way to infer them: undeclared, the emitted
+#: contract said ``"parameters": null`` and the entire time dimension of this
+#: module was invisible to it. It survived only because the frontend pair
+#: hand-wrote the two names — the moment a client is GENERATED from this
+#: schema, an undeclared parameter is a parameter that does not exist, and a
+#: calendar that can only ever ask for the server's default window is not a
+#: calendar.
+RANGE_PARAMETERS = [
+    OpenApiParameter(
+        name="start",
+        type=OpenApiTypes.DATETIME,
+        location=OpenApiParameter.QUERY,
+        required=False,
+        description="Inclusive start of the range (ISO 8601; naive values are "
+        "read in the server's timezone). Defaults to now.",
+    ),
+    OpenApiParameter(
+        name="end",
+        type=OpenApiTypes.DATETIME,
+        location=OpenApiParameter.QUERY,
+        required=False,
+        description="Inclusive end of the range (ISO 8601). Defaults to now + "
+        "DEFAULT_EXPANSION_HORIZON_DAYS (90 by default). An end before start "
+        "is 400 error.400.calendar_invalid_range.",
+    ),
+]
+
+#: Slot granularity for the availability read. Same reason as above.
+SLOT_MINUTES_PARAMETER = OpenApiParameter(
+    name="slot_minutes",
+    type=OpenApiTypes.INT,
+    location=OpenApiParameter.QUERY,
+    required=False,
+    description="Length of a bookable slot, in minutes. Must be >= 1 — zero "
+    "or negative is 400 error.400.calendar_invalid_slot_minutes, not a "
+    "clamped value. Defaults to DEFAULT_SLOT_MINUTES (30).",
+)
+
+
 def _parse_range(request):
     """Resolve [start, end] from query params, defaulting to now .. now +
     DEFAULT_EXPANSION_HORIZON_DAYS. Returns (start, end) or raises ValueError."""
@@ -211,7 +254,10 @@ class EventListCreateView(SerializerSeamMixin, APIView):
     request_serializer_class = EventCreateRequestSerializer
     response_serializer_class = EventResponseSerializer
 
-    @extend_schema(responses={200: EventResponseSerializer(many=True)})
+    @extend_schema(
+        parameters=RANGE_PARAMETERS,
+        responses={200: EventResponseSerializer(many=True)},
+    )
     def get(self, request):  # noqa: R007
         try:
             start, end = _parse_range(request)
@@ -461,7 +507,10 @@ class CalendarView(SerializerSeamMixin, APIView):
     stapel_anonymous_access = ANONYMOUS_ALLOWED
     response_serializer_class = CalendarResponseSerializer
 
-    @extend_schema(responses={200: CalendarResponseSerializer})
+    @extend_schema(
+        parameters=RANGE_PARAMETERS,
+        responses={200: CalendarResponseSerializer},
+    )
     def get(self, request):  # noqa: R007
         try:
             start, end = _parse_range(request)
@@ -499,7 +548,10 @@ class AvailabilityView(SerializerSeamMixin, APIView):
     stapel_anonymous_access = ANONYMOUS_ALLOWED
     response_serializer_class = AvailabilityResponseSerializer
 
-    @extend_schema(responses={200: AvailabilityResponseSerializer})
+    @extend_schema(
+        parameters=[*RANGE_PARAMETERS, SLOT_MINUTES_PARAMETER],
+        responses={200: AvailabilityResponseSerializer},
+    )
     def get(self, request):  # noqa: R007
         try:
             start, end = _parse_range(request)

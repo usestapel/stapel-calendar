@@ -197,6 +197,15 @@ of nothing.
   `truncated=true` means a series expansion hit
   `MAX_EXPANSION_OCCURRENCES` inside the range and later times only look
   free.
+- **The range is a query parameter, and it is declared.** `GET /events`,
+  `GET /calendar` and `GET /availability` all take `?start=&end=` (ISO 8601,
+  defaulting to now .. now + `DEFAULT_EXPANSION_HORIZON_DAYS`), and
+  availability additionally takes `?slot_minutes=`. All four are declared with
+  `@extend_schema(parameters=...)` in `views.py` and pinned by
+  `tests/test_contract.py::test_range_query_parameters_are_declared` — a view
+  that reads a query parameter it does not declare emits a contract with no
+  such parameter, and a client generated from it can only ever ask for the
+  server's default window.
 
 ### Admin categories — `@access` declarations (admin-suite AS-5)
 

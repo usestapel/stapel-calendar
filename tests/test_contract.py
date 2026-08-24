@@ -162,6 +162,57 @@ def test_flows_are_empty_no_flow_step_annotations():
     )
 
 
+#: Every read that accepts a time window, and what it must declare.
+#: The views read these out of ``request.query_params`` by hand, so nothing
+#: infers them — undeclared, the emitted contract said ``"parameters": null``
+#: and the whole range dimension of this module was invisible to a generated
+#: client. A calendar that can only ask for the server's default window is not
+#: a calendar, so the declaration is pinned here rather than trusted.
+RANGE_READS = {
+    "/calendar/api/v1/events": {"start", "end"},
+    "/calendar/api/v1/calendar": {"start", "end"},
+    "/calendar/api/v1/availability": {"start", "end", "slot_minutes"},
+}
+
+
+def test_range_query_parameters_are_declared():
+    schema = json.loads((DOCS / "schema.json").read_text())
+    for path, expected in RANGE_READS.items():
+        params = schema["paths"][path]["get"].get("parameters") or []
+        declared = {p["name"] for p in params if p.get("in") == "query"}
+        assert expected <= declared, (
+            f"GET {path} reads {sorted(expected - declared)} from the query "
+            "string but does not declare it — a generated client will not "
+            "have the parameter at all"
+        )
+        for p in params:
+            if p.get("in") != "query":
+                continue
+            assert p.get("schema", {}).get("type"), (
+                f"query parameter {p['name']} on GET {path} has no type"
+            )
+            assert p.get("description"), (
+                f"query parameter {p['name']} on GET {path} has no description "
+                "— the default and the refusal are what a client needs"
+            )
+
+
+def test_truncated_carries_its_whole_warning():
+    """``truncated`` means "later times in this answer only LOOK free".
+
+    Half that sentence is worse than none: a client that reads only "a series
+    expansion hit the" has a boolean it cannot render. The emitter takes ONE
+    line per attribute from the docstring, so a wrapped warning arrives cut
+    off — this pins the sentence, not the wrapping."""
+    schema = json.loads((DOCS / "schema.json").read_text())
+    described = schema["components"]["schemas"]["AvailabilityResponse"][
+        "properties"
+    ]["truncated"]["description"]
+    assert "only LOOK free" in described, (
+        f"truncated's description is cut off: {described!r}"
+    )
+
+
 # --- Standalone validation (contract-pipeline.md §9 fallback: no monolith slice) --
 # calendar is not mounted in stapel-example-monolith yet, so there is no aggregate
 # to diff byte-for-byte. These three checks are the substitute gate.

@@ -9,6 +9,34 @@
       "get": {
         "operationId": "calendar_api_v1_availability_retrieve",
         "description": "Free/busy + open booking slots for the requesting user over a range.\n\n**Permissions:** `IsAuthenticated`",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "end",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Inclusive end of the range (ISO 8601). Defaults to now + DEFAULT_EXPANSION_HORIZON_DAYS (90 by default). An end before start is 400 error.400.calendar_invalid_range."
+          },
+          {
+            "in": "query",
+            "name": "slot_minutes",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Length of a bookable slot, in minutes. Must be >= 1 — zero or negative is 400 error.400.calendar_invalid_slot_minutes, not a clamped value. Defaults to DEFAULT_SLOT_MINUTES (30)."
+          },
+          {
+            "in": "query",
+            "name": "start",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Inclusive start of the range (ISO 8601; naive values are read in the server's timezone). Defaults to now."
+          }
+        ],
         "tags": [
           "Calendar"
         ],
@@ -35,6 +63,26 @@
       "get": {
         "operationId": "calendar_api_v1_calendar_retrieve",
         "description": "The requesting user's calendar over a range: concrete events plus the\nvirtual+materialized occurrences of every series they're on.\n\n**Permissions:** `IsAuthenticated`",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "end",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Inclusive end of the range (ISO 8601). Defaults to now + DEFAULT_EXPANSION_HORIZON_DAYS (90 by default). An end before start is 400 error.400.calendar_invalid_range."
+          },
+          {
+            "in": "query",
+            "name": "start",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Inclusive start of the range (ISO 8601; naive values are read in the server's timezone). Defaults to now."
+          }
+        ],
         "tags": [
           "Calendar"
         ],
@@ -61,6 +109,26 @@
       "get": {
         "operationId": "calendar_api_v1_events_list",
         "description": "List the requesting user's events in a range, or create an event.\n\n**Permissions:** `IsAuthenticated`",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "end",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Inclusive end of the range (ISO 8601). Defaults to now + DEFAULT_EXPANSION_HORIZON_DAYS (90 by default). An end before start is 400 error.400.calendar_invalid_range."
+          },
+          {
+            "in": "query",
+            "name": "start",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Inclusive start of the range (ISO 8601; naive values are read in the server's timezone). Defaults to now."
+          }
+        ],
         "tags": [
           "Calendar"
         ],
@@ -422,7 +490,7 @@
           },
           "truncated": {
             "type": "boolean",
-            "description": "True when a series expansion hit the"
+            "description": "True when a series expansion hit MAX_EXPANSION_OCCURRENCES inside the range, so later times in this answer only LOOK free — show the reader that the answer is incomplete rather than presenting it as availability"
           }
         }
       },

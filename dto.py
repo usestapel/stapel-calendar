@@ -102,9 +102,7 @@ class AvailabilityResponse:
     Attributes:
         busy: Coalesced busy intervals in the range.
         slots: Open booking slots (empty if no availability windows set).
-        truncated: True when a series expansion hit the
-            MAX_EXPANSION_OCCURRENCES cap inside the range — times past the
-            cap only look free; don't book them blindly.
+        truncated: True when a series expansion hit MAX_EXPANSION_OCCURRENCES inside the range, so later times in this answer only LOOK free — show the reader that the answer is incomplete rather than presenting it as availability.
     """
 
     busy: List[IntervalResponse] = field(default_factory=list)

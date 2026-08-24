@@ -4,6 +4,42 @@ All notable changes to stapel-calendar are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Pre-1.0 semver: **minor = breaking**, patch = compatible.
 
+## [0.6.1] — 2026-08-24
+
+### Fixed — the emitted contract had no range dimension at all
+
+`GET /events`, `GET /calendar` and `GET /availability` read `start` / `end`
+from `request.query_params`, and availability reads `slot_minutes` — none of
+it declared. Being plain `APIView`s, nothing inferred them, so
+`docs/schema.json` emitted `"parameters": null` for all three operations:
+**the whole time window and slot granularity of this module were invisible to
+the contract.** It worked only because the frontend pair hand-wrote the two
+names. The moment a client is generated from the schema, an undeclared
+parameter is a parameter that does not exist — and a calendar that can only
+ever ask for the server's default window is not a calendar.
+
+- All four are now declared with `@extend_schema(parameters=...)`, carrying
+  their type, their default (now .. now + `DEFAULT_EXPANSION_HORIZON_DAYS`;
+  `DEFAULT_SLOT_MINUTES` for slots) and the refusal they cause
+  (`error.400.calendar_invalid_range`,
+  `error.400.calendar_invalid_slot_minutes`).
+- `tests/test_contract.py::test_range_query_parameters_are_declared` pins it,
+  and requires every query parameter to carry a type **and** a description —
+  so the hole cannot silently reopen on the next read that takes a window.
+
+### Fixed — `AvailabilityResponse.truncated` shipped half its warning
+
+The emitter takes one line per attribute from the DTO docstring, and
+`truncated`'s warning was wrapped across three — so the contract said
+`"True when a series expansion hit the"` and stopped. Half that sentence is
+worse than none: a client reading it has a boolean it cannot render, on the
+one field whose entire purpose is to say *this answer is incomplete, later
+times only LOOK free*. The docstring line is now one line, the whole sentence
+reaches the schema, and a test pins it.
+
+No behaviour changed; the only diff outside docs is the parameter
+declarations and the docstring.
+
 ## [0.6.0] — 2026-08-24
 
 ### Fixed — the erasure answers its probe: stapel-calendar registers as a GDPR data owner
