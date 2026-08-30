@@ -139,6 +139,7 @@ event to its invitees; `scope` opens events to the whole scope the
 | Consume | `gdpr.erasure.requested` | `{request_id, correlation_id, subject_type, subject_key, workspace_id?}` | `schemas/consumes/gdpr.erasure.requested.json` |
 | Consume | `gdpr.owner.probe` | `{correlation_id}` | `schemas/consumes/gdpr.owner.probe.json` |
 | Consume | `user.deleted` (deprecated) | `{user_id, correlation_id?}` | `schemas/consumes/user.deleted.json` |
+| Consume | `user.merged` | `{from_user_id, into_user_id, reason?}` | `schemas/consumes/user.merged.json` |
 | Emit | `gdpr.section.erased` | `{owner, subject_type, subject_key, correlation_id, receipt_id, counts}` | `schemas/emits/gdpr.section.erased.json` |
 | Emit | `gdpr.owner.alive` | `{owner, subject_types, correlation_id}` | `schemas/emits/gdpr.owner.alive.json` |
 | Function (provides) | `calendar.free_busy` | `{user_id, start, end, scope_key?}` -> `{busy: [{start, end}], truncated}` | `schemas/functions/calendar.free_busy.json` |
@@ -180,6 +181,32 @@ reported `calendar: alive=false` forever and a fleet's erasure waited on
 this owner until it timed out — while the monolith path erased perfectly
 well. Liveness is answered by the subscriber that erases or it is evidence
 of nothing.
+
+### A merge is not a delete — `user.merged` (`actions.py`)
+
+The other half of an account's life cycle, and the one an app that only
+knows `user.deleted` gets silently wrong. stapel-auth folds an anonymous
+guest into an existing account on sign-in and then deletes the guest row;
+`Event.owner`, `Participant.user` and `AvailabilityWindow.user` are all
+`CASCADE`, so the guest's calendar goes with them and no erasure is ever
+requested for it. `stapel_calendar.actions.handle_user_merged` re-points all
+three onto the survivor in one transaction:
+
+| Model | Column | Rule |
+|---|---|---|
+| `Event` | `owner` | plain rewrite; occurrences are `Event` rows and move with their master |
+| `Participant` | `user` | deduplicated against `cal_participant_uniq` — where both accounts were invited to one event the survivor's own RSVP stays and the guest's row is dropped |
+| `AvailabilityWindow` | `user` | plain rewrite; overlapping windows are legal (free/busy unions them) |
+
+A guest who owns nothing here is a quiet no-op (also the at-least-once
+idempotency path). A guest who owns rows while the survivor has no user row
+here yet raises `MergeTargetNotReady` so the outbox redelivers — returning
+success would mark the event delivered and lose the calendar. A malformed
+id is logged and dropped: no redelivery can fix a typo.
+
+`stapel_core.lifecycle.E001` (tag `stapel_lifecycle`, stapel-core 0.52.1)
+is the fleet-wide gate on that pair, and `tests/test_user_merged.py` asserts
+it green in this repo.
 
 ### API contract notes
 

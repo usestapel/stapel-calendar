@@ -4,6 +4,63 @@ All notable changes to stapel-calendar are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Pre-1.0 semver: **minor = breaking**, patch = compatible.
 
+## [0.7.0] — 2026-08-30
+
+### Fixed — a merge is not a delete: the guest's calendar no longer vanishes at sign-in
+
+This module knew half of an account's life cycle. `user.deleted` was
+answered from the first release; `user.merged` — stapel-auth folding an
+anonymous guest into an existing account when the guest signs in — was not
+answered at all, and silence there is not neutrality, it is a wrong answer
+given quietly.
+
+stapel-auth deletes the absorbed guest row, and `Event.owner`,
+`Participant.user` and `AvailabilityWindow.user` are all `CASCADE`. So a
+visitor who booked a slot, RSVP'd to an invitation or published availability
+before signing in lost every bit of it the moment they signed in with an
+account that already existed. Nothing raised, nothing retried, nothing was
+logged, and no erasure was ever requested for the rows — the first report is
+a person saying the booking they made is gone.
+
+`stapel_calendar.actions.handle_user_merged` now carries the guest's
+calendar onto the survivor in one transaction:
+
+- **`Event.owner`** — plain rewrite. Materialized occurrences are `Event`
+  rows carrying their own owner, so masters and occurrences move together;
+  `cal_event_uniq_occurrence` is scoped to `(recurrence_parent,
+  recurrence_id)` and cannot be tripped by a change of owner.
+- **`Participant.user`** — deduplicated against `cal_participant_uniq`
+  first. Both accounts may be invited to one event, and there the survivor's
+  own row wins with the RSVP they answered as themselves; the guest's
+  duplicate is dropped rather than reassigned into a constraint violation.
+- **`AvailabilityWindow.user`** — plain rewrite. No user-scoped constraint,
+  and overlapping windows are legal (free/busy unions them), so two
+  accounts' windows simply add up.
+
+Other people's events are untouched: only the guest's own participation rows
+move, the same line `erase_subject` draws.
+
+Two "unknown id" situations that must not be conflated. A guest who owns
+nothing here is a quiet no-op — the common case, and also the at-least-once
+idempotency path. A guest who owns rows while the survivor has no user row
+here yet raises `MergeTargetNotReady`, which the comm layer turns into a
+redelivery: returning success would let the outbox mark the event delivered
+and lose the calendar for good. A malformed id is neither — it names no row
+and no redelivery can fix it, so it is logged and dropped instead of
+replayed as a poison pill (`UUIDField` raises `ValidationError`, which is
+not a `ValueError`; both are caught).
+
+### Changed — `stapel-core>=0.52.1`
+
+Core 0.52.1 adds the `stapel_core.lifecycle.E001` system check (tag
+`stapel_lifecycle`): an app that subscribes `user.deleted` and not
+`user.merged` is a boot-time ERROR. This module's `user.deleted` subscriber
+is a closure core registers on its behalf from `register_gdpr_owner`, and
+core stamps it with this module's name so the pair is charged here rather
+than to core — which is exactly what `tests/test_user_merged.py::
+TestSubscription::test_the_lifecycle_pair_check_is_green` asserts. The floor
+is raised so that gate can never be skipped for want of the check.
+
 ## [0.6.1] — 2026-08-24
 
 ### Fixed — the emitted contract had no range dimension at all

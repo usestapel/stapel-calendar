@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stapel-calendar"
-version = "0.6.1"
+version = "0.7.0"
 description = "Calendar and scheduling for the Stapel framework"
 readme = "README.md"
 license = { text = "MIT" }
@@ -29,7 +29,7 @@ dependencies = [
     # deprecated user.deleted) that apps.ready() hands one callable to.
     # (0.27.0 had brought HasWorkspaceMandateIfScoped, the gate the by-id
     # event reads carry, and error.503.mandate_unavailable in errors.json.)
-    "stapel-core>=0.35.0,<1.0",
+    "stapel-core>=0.52.1,<1.0",
     "python-dateutil>=2.8,<3",
 ]
 
