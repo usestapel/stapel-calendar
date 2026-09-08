@@ -6,7 +6,7 @@ source said whether that was wanted (``stapel_core.adoption`` W002).
 ``views.py`` now states it per view; this module keeps the statement honest.
 
 The half that would hurt in production is the open half: a real consumer
-(meettoday) renders the guest's one and only page with
+(a meeting app) renders the guest's one and only page with
 ``GET /calendar/api/v1/events`` on it. A regression that closes that view
 turns a guest's landing page into an error — in production, not in review.
 The first test below is the one that catches it.

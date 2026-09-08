@@ -218,7 +218,7 @@ The answer is drawn along the line this module's own filtering already draws:
 - `GET /events`, `GET /calendar` — bounded by `_visible_events`, i.e. by the
   `VISIBILITY` axis and the deployment's scope provider. A guest gets an
   empty range, which is the truth. **This is a live guest path**: a real
-  consumer (meettoday) renders the guest's one and only page with
+  consumer (a meeting app) renders the guest's one and only page with
   `GET /calendar/api/v1/events` on it, so closing it would have turned a
   guest's landing page into an error in production.
 - `GET /availability` — computed strictly over `request.user`'s own

@@ -18,7 +18,7 @@ the rule is drawn along the line the module's own filtering already draws:
 the ``VISIBILITY`` axis and the scope provider, so what comes back is what
 the deployment already decided this caller may see; for a guest that is an
 empty range. This is not hypothetical politeness: a real consumer
-(meettoday) renders the guest's one and only page with
+(a meeting app) renders the guest's one and only page with
 ``GET /calendar/api/v1/events`` in it, and a 403 there would break the guest
 landing page in production, not in review. ``EventListCreateView`` (GET),
 ``CalendarView`` and ``AvailabilityView`` are therefore
@@ -246,7 +246,7 @@ class EventListCreateView(SerializerSeamMixin, APIView):
     """List the requesting user's events in a range, or create an event."""
 
     permission_classes = [permissions.IsAuthenticated]
-    # GET is a live guest path: meettoday renders the guest's only page with
+    # GET is a live guest path: a meeting app renders the guest's only page with
     # this call in it. The range is bounded by `_visible_events`, so a guest
     # gets its own — empty — window rather than a 403 the page would have to
     # special-case. POST is the opposite answer and is guarded in `post`.
