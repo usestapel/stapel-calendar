@@ -4,6 +4,30 @@ All notable changes to stapel-calendar are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Pre-1.0 semver: **minor = breaking**, patch = compatible.
 
+## [0.7.1] — 2026-09-11
+
+### Fixed — an event title could put a property into somebody else's calendar
+
+Security audit 2026-09-11, L-7. `ics._ESCAPES` covered backslash, semicolon,
+comma and LF, and not CR. A title is attacker-supplied text on every surface
+that lets one person invite another, and line endings in RFC 5545 are CRLF,
+so a title carrying `\rATTENDEE:mallory@example.net` reached a CR-splitting
+reader as a **new property** on the event — an added attendee, or with
+`\rORGANIZER:`/`\rURL:` something worse. `_escape` collapses `\r\n` and a lone
+`\r` onto the one escaped newline the format has, so a Windows line break is
+one break and not two, and the round-trip through `parse_ics` is unchanged.
+
+### Fixed — content lines are folded at 75 octets
+
+Same section of the same standard (§3.1): a content line is at most 75
+octets, and a reader meeting a longer one may truncate it or give up on the
+file. Nothing folded, and an export of a user-typed 300-character title
+produces exactly that line. `ics._fold` folds with CRLF + one space — the
+continuation `parse_ics` and every other reader already strips — splitting on
+octets and never inside a UTF-8 character, because a folded half that is not
+valid UTF-8 on its own is a file some readers refuse outright. Applied once,
+in `to_ics`, so every producer above it still writes one logical line.
+
 ## [0.7.0] — 2026-08-30
 
 ### Fixed — a merge is not a delete: the guest's calendar no longer vanishes at sign-in

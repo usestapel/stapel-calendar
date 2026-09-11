@@ -11,15 +11,60 @@ from datetime import datetime, timezone
 
 PRODID = "-//Stapel//stapel-calendar//EN"
 
-_ESCAPES = {"\\": "\\\\", ";": "\\;", ",": "\\,", "\n": "\\n"}
+# RFC 5545 §3.3.11 TEXT: backslash, semicolon, comma and the line break are
+# the four things that must not reach a reader as themselves. CR is here
+# because a line ending in this format is CRLF and plenty of readers split on
+# either half: a title carrying "\rATTENDEE:mallory@example.net" used to
+# arrive as a NEW PROPERTY on the event, which adds an attendee to somebody
+# else's calendar entry. Both halves collapse to the one escaped newline the
+# format has, so "\r\n" is one break and not two.
+_ESCAPES = {"\\": "\\\\", ";": "\\;", ",": "\\,", "\n": "\\n", "\r": "\\n"}
 _UNESCAPES = {"\\\\": "\\", "\\;": ";", "\\,": ",", "\\n": "\n", "\\N": "\n"}
+
+#: RFC 5545 §3.1: a content line is at most 75 OCTETS, excluding the CRLF.
+MAX_LINE_OCTETS = 75
 
 
 def _escape(text: str) -> str:
+    # CRLF first, so a Windows line break does not become two breaks.
+    text = (text or "").replace("\r\n", "\n")
     out = []
-    for ch in text or "":
+    for ch in text:
         out.append(_ESCAPES.get(ch, ch))
     return "".join(out)
+
+
+def _fold(line: str) -> str:
+    """Fold one content line to RFC 5545's 75-octet limit.
+
+    Continuations are CRLF followed by ONE space, which is what
+    :func:`parse_ics` (and every reader) strips back off. The split is made on
+    octets, never inside a UTF-8 character: a folded half that is not valid
+    UTF-8 on its own is a file some readers refuse outright.
+
+    A reader meeting a longer line is free to truncate it or give up on the
+    file — and an unfolded 300-character title is exactly what an export of
+    user-typed text produces.
+    """
+    encoded = line.encode("utf-8")
+    if len(encoded) <= MAX_LINE_OCTETS:
+        return line
+
+    pieces = []
+    # First physical line gets the full width; every continuation spends one
+    # octet on its leading space.
+    budget = MAX_LINE_OCTETS
+    start = 0
+    while start < len(encoded):
+        end = min(start + budget, len(encoded))
+        if end < len(encoded):
+            # Walk back off a UTF-8 continuation byte (10xxxxxx).
+            while end > start and (encoded[end] & 0xC0) == 0x80:
+                end -= 1
+        pieces.append(encoded[start:end].decode("utf-8"))
+        start = end
+        budget = MAX_LINE_OCTETS - 1
+    return "\r\n ".join(pieces)
 
 
 def _unescape(text: str) -> str:
@@ -83,7 +128,9 @@ def to_ics(events) -> str:
     for event in events:
         lines.extend(event_to_vevent(event))
     lines.append("END:VCALENDAR")
-    return "\r\n".join(lines) + "\r\n"
+    # Folded at the very end, so every producer above writes one logical line
+    # and exactly one place knows the format's width.
+    return "\r\n".join(_fold(line) for line in lines) + "\r\n"
 
 
 def parse_ics(text: str) -> list[dict]:
