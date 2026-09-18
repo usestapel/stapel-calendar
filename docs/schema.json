@@ -315,7 +315,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EventResponse"
+                  "$ref": "#/components/schemas/EventDeleteResponse"
                 }
               }
             },
@@ -577,6 +577,23 @@
           "title"
         ]
       },
+      "EventDeleteResponse": {
+        "type": "object",
+        "description": "The outcome of `DELETE /events/{event_id}`.\n\nNot an `EventResponse`: a delete answers what it did, and for a\nmaterialized occurrence what it did is not a deletion. The body is one\nword because that word is the whole information — but it IS information,\nwhich is why the endpoint does not answer 204.",
+        "properties": {
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StatusEnum"
+              }
+            ],
+            "description": "What the delete did — `deleted` (the row is gone) or `cancelled` (a materialized occurrence was tombstoned and still reads back)\n\n* `deleted` - The row is gone\n* `cancelled` - A materialized occurrence was tombstoned, not removed — it still reads back, with `status: cancelled`, so the recurrence rule cannot resurrect it at that instant"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
       "EventResponse": {
         "type": "object",
         "description": "A calendar event (series master or concrete occurrence).",
@@ -808,6 +825,14 @@
         "required": [
           "rsvp"
         ]
+      },
+      "StatusEnum": {
+        "enum": [
+          "deleted",
+          "cancelled"
+        ],
+        "type": "string",
+        "description": "* `deleted` - The row is gone\n* `cancelled` - A materialized occurrence was tombstoned, not removed — it still reads back, with `status: cancelled`, so the recurrence rule cannot resurrect it at that instant"
       }
     },
     "securitySchemes": {

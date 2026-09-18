@@ -50,21 +50,26 @@ moment it is cheap to fix: when somebody changes a mount.
 
 What it found on its first run — 9 of 9 operations driven, 1 red:
 
-* ``DELETE /calendar/api/v1/events/{event_id}`` declares ``EventResponse``
+* ``DELETE /calendar/api/v1/events/{event_id}`` declared ``EventResponse``
   (ten REQUIRED properties: ``id``, ``title``, ``start``, ``end``,
-  ``owner_id``, ``status``, …) and answers ``{"status": "deleted"}`` — or
+  ``owner_id``, ``status``, …) and answered ``{"status": "deleted"}`` — or
   ``{"status": "cancelled"}`` on the tombstone branch — and nothing else. The
   body is deliberate and correct behaviour (``views.py`` ``EventDetailView.
   delete``: a standalone event is deleted, a materialized occurrence is
-  tombstoned so the rule instant does not resurrect); what is wrong is the
+  tombstoned so the rule instant does not resurrect); what was wrong was the
   annotation ``@extend_schema(responses={200: EventResponseSerializer})``
   directly above it, copied from the GET/PATCH halves of the same class. A
-  generated client reads ``body.id`` after a delete and gets ``undefined``;
+  generated client read ``body.id`` after a delete and got ``undefined``;
   worse, ``body.status`` exists on BOTH shapes and means an event status
   (confirmed/tentative/cancelled) in the declared one and an outcome word in
-  the real one, so a client that switches on it cannot tell the two apart.
-  Recorded in ``KNOWN_MISMATCHES`` and left exactly as it is: this is a gate,
-  not a fix.
+  the real one, so a client that switched on it could not tell the two apart.
+
+  Closed in 0.8.0: the body STAYS — it carries information a 204 would throw
+  away, namely that an occurrence was cancelled rather than removed — and is
+  declared for what it is, ``EventDeleteResponse {status: enum[deleted,
+  cancelled]}``. The recipe below drives both branches and asserts the word
+  each one answers, because an enum over both makes the schema check blind
+  to a swap.
 
 The other eight are honest, including every ``nullable`` claim, in both the
 populated and the empty state. ``test_the_gate_is_not_blind`` proves that is
@@ -526,21 +531,7 @@ def _availability_empty(call):
 #: Operations whose declared body the wire does not send, with the defect and
 #: its owner. ``strict=True``: a fixed entry fails until it is deleted, so a
 #: finding can be neither forgotten nor quietly kept.
-KNOWN_MISMATCHES = {
-    ("DELETE", V1 + "/events/{event_id}"):
-        "declares EventResponse — ten REQUIRED properties, id/title/start/"
-        "end/owner_id/status among them — and answers {\"status\": "
-        "\"deleted\"} for a standalone event and {\"status\": \"cancelled\"} "
-        "for a materialized occurrence, and nothing else. Both bodies are "
-        "deliberate (views.py, EventDetailView.delete: the row is removed, or "
-        "tombstoned so the rule instant does not resurrect); the annotation "
-        "@extend_schema(responses={200: EventResponseSerializer}) above it "
-        "was copied from the get/patch halves of the same class and never "
-        "corrected. A generated client reads body.id after a delete and gets "
-        "undefined — and `status` exists on BOTH shapes with different "
-        "meanings (an event status vs an outcome word), so a client cannot "
-        "even tell them apart. Owner: stapel-calendar.",
-}
+KNOWN_MISMATCHES: dict[tuple[str, str], str] = {}
 
 
 def test_the_contract_declares_something_to_check():

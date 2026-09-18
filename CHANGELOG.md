@@ -1,5 +1,44 @@
 # Changelog
 
+## [0.8.0] — 2026-09-18
+
+### Fixed — `DELETE /events/{event_id}` declared an event where it answers an outcome
+
+Minor, no migration. `docs/schema.json` changes shape — the operation now
+answers **`EventDeleteResponse`** instead of `EventResponse` — so the
+frontend pair must be regenerated. The wire is byte-for-byte what it was.
+
+The endpoint declared `EventResponse`: ten REQUIRED properties, `id`,
+`title`, `start`, `end`, `owner_id`, `status` among them. It answers
+`{"status": "deleted"}` for a standalone event and `{"status": "cancelled"}`
+for a materialized occurrence — and nothing else. Both bodies are correct
+behaviour: an occurrence is TOMBSTONED rather than removed, so the
+recurrence rule cannot resurrect it at that instant, and the event still
+reads back. What was wrong is the annotation, copied from the GET/PATCH
+halves of the same class and never corrected.
+
+A generated client read `body.id` after a delete and got `undefined`. Worse,
+`status` exists on both shapes with different meanings — an event status
+(`confirmed`/`tentative`/`cancelled`) in the declared one, an outcome word
+in the real one — so a client that switched on it could not tell them apart.
+The drift gate saw nothing: it compares the committed document against a
+fresh emission of the same annotation.
+
+The body **stays**. A 204 would throw away the one thing the caller needs to
+know — whether the row is gone or still there, cancelled — so the outcome is
+now declared for what it is:
+
+```
+EventDeleteResponse { status: "deleted" | "cancelled" }
+```
+
+`status` is an enum (`EventDeletionOutcome` in `dto.py`), required, and each
+member carries its own sentence in the document. `tests/test_contract_wire.py`
+drives both branches against the committed schema AND asserts the word each
+one answers, because an enum over both words makes the schema check blind to
+a swap; `tests/test_review_hardening.py` already pins the behaviour behind
+them. The `KNOWN_MISMATCHES` entry is deleted; the file has none left.
+
 ## [0.7.2] — 2026-09-17
 
 Patch: delete this module's copies of `gdpr.section.erased` and

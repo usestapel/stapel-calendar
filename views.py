@@ -72,6 +72,8 @@ from .conf import calendar_settings
 from .dto import (
     AvailabilityResponse,
     CalendarResponse,
+    EventDeleteResponse,
+    EventDeletionOutcome,
     EventResponse,
     IntervalResponse,
     OccurrenceResponse,
@@ -93,6 +95,7 @@ from .serializers import (
     AvailabilityResponseSerializer,
     CalendarResponseSerializer,
     EventCreateRequestSerializer,
+    EventDeleteResponseSerializer,
     EventResponseSerializer,
     EventUpdateRequestSerializer,
     ParticipantsReplaceRequestSerializer,
@@ -391,7 +394,14 @@ class EventDetailView(SerializerSeamMixin, APIView):
         response_cls = self.get_response_serializer_class()
         return StapelResponse(response_cls(event_to_dto(event)))
 
-    @extend_schema(responses={200: EventResponseSerializer})
+    # NOT EventResponse, whatever the two halves of this class above return:
+    # a delete answers WHAT IT DID, and for a materialized occurrence what it
+    # did is not a deletion. The annotation used to be copied from get/patch
+    # and promised ten required properties on a one-word body, so a generated
+    # client read `body.id` after a delete and got undefined — and `status`
+    # exists on both shapes with different meanings (an event status vs an
+    # outcome word), so it could not even tell them apart.
+    @extend_schema(responses={200: EventDeleteResponseSerializer})
     def delete(self, request, event_id):  # noqa: R007
         event = self._get(request, event_id)
         if event is None:
@@ -401,12 +411,21 @@ class EventDetailView(SerializerSeamMixin, APIView):
         if event.is_occurrence:
             # Deleting a materialized occurrence must not resurrect the
             # virtual one at its rule instant — tombstone it (the EXDATE
-            # analog) instead of removing the row.
+            # analog) instead of removing the row. The body says so: the
+            # caller's event still exists and still reads back.
             event.status = EventStatus.CANCELLED
             event.save(update_fields=["status", "updated_at"])
-            return StapelResponse({"status": "cancelled"})  # noqa: R006
+            return StapelResponse(
+                EventDeleteResponseSerializer(
+                    EventDeleteResponse(status=EventDeletionOutcome.CANCELLED)
+                )
+            )
         event.delete()
-        return StapelResponse({"status": "deleted"})  # noqa: R006
+        return StapelResponse(
+            EventDeleteResponseSerializer(
+                EventDeleteResponse(status=EventDeletionOutcome.DELETED)
+            )
+        )
 
 
 @extend_schema(tags=["Calendar"])

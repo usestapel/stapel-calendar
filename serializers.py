@@ -9,6 +9,7 @@ from .dto import (
     AvailabilityResponse,
     CalendarResponse,
     EventCreateRequest,
+    EventDeleteResponse,
     EventResponse,
     EventUpdateRequest,
     IntervalResponse,
@@ -27,6 +28,11 @@ class ParticipantResponseSerializer(StapelDataclassSerializer):
 class EventResponseSerializer(StapelDataclassSerializer):
     class Meta:
         dataclass = EventResponse
+
+
+class EventDeleteResponseSerializer(StapelDataclassSerializer):
+    class Meta:
+        dataclass = EventDeleteResponse
 
 
 class OccurrenceResponseSerializer(StapelDataclassSerializer):

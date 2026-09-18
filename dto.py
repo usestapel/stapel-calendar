@@ -1,6 +1,7 @@
 """Dataclass DTOs — the API models of stapel-calendar (never ORM instances)."""
 from dataclasses import dataclass, field
 from datetime import datetime
+from enum import Enum
 from typing import List, Optional
 
 
@@ -48,6 +49,34 @@ class EventResponse:
     rrule: str
     recurrence_parent_id: Optional[str] = None
     participants: List[ParticipantResponse] = field(default_factory=list)
+
+
+class EventDeletionOutcome(str, Enum):
+    """What a delete DID, which is not always the same thing.
+
+    Members:
+        DELETED: The row is gone.
+        CANCELLED: A materialized occurrence was tombstoned, not removed — it still reads back, with `status: cancelled`, so the recurrence rule cannot resurrect it at that instant.
+    """
+
+    DELETED = "deleted"
+    CANCELLED = "cancelled"
+
+
+@dataclass
+class EventDeleteResponse:
+    """The outcome of `DELETE /events/{event_id}`.
+
+    Not an `EventResponse`: a delete answers what it did, and for a
+    materialized occurrence what it did is not a deletion. The body is one
+    word because that word is the whole information — but it IS information,
+    which is why the endpoint does not answer 204.
+
+    Attributes:
+        status: What the delete did — `deleted` (the row is gone) or `cancelled` (a materialized occurrence was tombstoned and still reads back).
+    """
+
+    status: EventDeletionOutcome
 
 
 @dataclass
