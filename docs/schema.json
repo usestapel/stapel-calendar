@@ -327,7 +327,7 @@
     "/calendar/api/v1/events/{event_id}/ics": {
       "get": {
         "operationId": "calendar_api_v1_events_ics_retrieve",
-        "description": "Export an event (series RRULE included) as an RFC 5545 .ics file.\n\n**Permissions:** `HasWorkspaceMandateIfScoped`",
+        "description": "The event as an RFC 5545 calendar file (attachment).\n\n**Permissions:** `HasWorkspaceMandateIfScoped`",
         "parameters": [
           {
             "in": "path",
@@ -349,7 +349,14 @@
         ],
         "responses": {
           "200": {
-            "description": "No response body"
+            "content": {
+              "text/calendar": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": ""
           }
         }
       }

@@ -503,6 +503,10 @@ class EventICSView(SerializerSeamMixin, APIView):
     # closed for the same reason, with the same gate.
     permission_classes = [HasWorkspaceMandateIfScoped]
 
+    @extend_schema(
+        responses={(200, "text/calendar"): OpenApiTypes.STR},
+        description="The event as an RFC 5545 calendar file (attachment).",
+    )
     def get(self, request, event_id):
         qs = get_scope_provider().filter(Event.objects.all(), request)
         event = qs.filter(id=event_id).first()

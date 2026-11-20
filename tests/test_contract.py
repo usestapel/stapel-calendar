@@ -85,7 +85,7 @@ TRIAD = ("schema.json", "flows.json", "errors.json")
 # ceiling to 5000 for this module, do not shorten intent lines to fit — the
 # surface section is the part an agent reads to avoid rewriting a mechanism
 # that already exists. The budget stays enforced, just at 5000.
-ARTIFACTS = TRIAD + ("capabilities.json", "llms.txt")
+ARTIFACTS = TRIAD + ("schema.v2.json", "capabilities.json", "llms.txt")
 LLMS_TXT_BUDGET = "5000"
 
 

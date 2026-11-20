@@ -1,0 +1,1185 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "",
+    "version": "0.0.0",
+    "x-stapel-contract": 2
+  },
+  "paths": {
+    "/calendar/api/v1/availability": {
+      "get": {
+        "operationId": "calendar_api_v1_availability_retrieve",
+        "description": "Free/busy + open booking slots for the requesting user over a range.\n\n**Permissions:** `IsAuthenticated`",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "end",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Inclusive end of the range (ISO 8601). Defaults to now + DEFAULT_EXPANSION_HORIZON_DAYS (90 by default). An end before start is 400 error.400.calendar_invalid_range."
+          },
+          {
+            "in": "query",
+            "name": "slot_minutes",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Length of a bookable slot, in minutes. Must be >= 1 — zero or negative is 400 error.400.calendar_invalid_slot_minutes, not a clamped value. Defaults to DEFAULT_SLOT_MINUTES (30)."
+          },
+          {
+            "in": "query",
+            "name": "start",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Inclusive start of the range (ISO 8601; naive values are read in the server's timezone). Defaults to now."
+          }
+        ],
+        "tags": [
+          "Calendar"
+        ],
+        "security": [
+          {
+            "JWTCookieAuth": []
+          },
+          {
+            "JWTBearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvailabilityResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StapelError"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "x-stapel-errors": [
+              "error.400.calendar_invalid_range",
+              "error.400.calendar_invalid_slot_minutes"
+            ]
+          }
+        }
+      }
+    },
+    "/calendar/api/v1/calendar": {
+      "get": {
+        "operationId": "calendar_api_v1_calendar_retrieve",
+        "description": "The requesting user's calendar over a range: concrete events plus the\nvirtual+materialized occurrences of every series they're on.\n\n**Permissions:** `IsAuthenticated`",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "end",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Inclusive end of the range (ISO 8601). Defaults to now + DEFAULT_EXPANSION_HORIZON_DAYS (90 by default). An end before start is 400 error.400.calendar_invalid_range."
+          },
+          {
+            "in": "query",
+            "name": "start",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Inclusive start of the range (ISO 8601; naive values are read in the server's timezone). Defaults to now."
+          }
+        ],
+        "tags": [
+          "Calendar"
+        ],
+        "security": [
+          {
+            "JWTCookieAuth": []
+          },
+          {
+            "JWTBearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StapelError"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "x-stapel-errors": [
+              "error.400.calendar_invalid_range"
+            ]
+          }
+        }
+      }
+    },
+    "/calendar/api/v1/events": {
+      "get": {
+        "operationId": "calendar_api_v1_events_list",
+        "description": "List the requesting user's events in a range, or create an event.\n\n**Permissions:** `IsAuthenticated`",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "end",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Inclusive end of the range (ISO 8601). Defaults to now + DEFAULT_EXPANSION_HORIZON_DAYS (90 by default). An end before start is 400 error.400.calendar_invalid_range."
+          },
+          {
+            "in": "query",
+            "name": "start",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "Inclusive start of the range (ISO 8601; naive values are read in the server's timezone). Defaults to now."
+          }
+        ],
+        "tags": [
+          "Calendar"
+        ],
+        "security": [
+          {
+            "JWTCookieAuth": []
+          },
+          {
+            "JWTBearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EventResponse"
+                  }
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StapelError"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "x-stapel-errors": [
+              "error.400.calendar_invalid_range"
+            ]
+          }
+        }
+      },
+      "post": {
+        "operationId": "calendar_api_v1_events_create",
+        "description": "List the requesting user's events in a range, or create an event.\n\n**Permissions:** `IsAuthenticated`",
+        "tags": [
+          "Calendar"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventCreateRequest"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/EventCreateRequest"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/EventCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "JWTCookieAuth": []
+          },
+          {
+            "JWTBearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StapelError"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "x-stapel-errors": [
+              "error.400.calendar_invalid_range",
+              "error.400.calendar_invalid_recurrence"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StapelError"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-stapel-errors": [
+              "error.403.forbidden"
+            ]
+          }
+        }
+      }
+    },
+    "/calendar/api/v1/events/{event_id}": {
+      "get": {
+        "operationId": "calendar_api_v1_events_retrieve",
+        "description": "Retrieve/update/delete a single event (mutations owner-only).\n\n**Permissions:** `HasWorkspaceMandateIfScoped`",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true
+          }
+        ],
+        "tags": [
+          "Calendar"
+        ],
+        "security": [
+          {
+            "JWTCookieAuth": []
+          },
+          {
+            "JWTBearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StapelError"
+                }
+              }
+            },
+            "description": "Not Found",
+            "x-stapel-errors": [
+              "error.404.calendar_event_not_found"
+            ]
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StapelError"
+                }
+              }
+            },
+            "description": "Service Unavailable",
+            "x-stapel-errors": [
+              "error.503.mandate_unavailable"
+            ]
+          }
+        }
+      },
+      "patch": {
+        "operationId": "calendar_api_v1_events_partial_update",
+        "description": "Retrieve/update/delete a single event (mutations owner-only).\n\n**Permissions:** `HasWorkspaceMandateIfScoped`",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true
+          }
+        ],
+        "tags": [
+          "Calendar"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedEventUpdateRequest"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedEventUpdateRequest"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchedEventUpdateRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWTCookieAuth": []
+          },
+          {
+            "JWTBearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StapelError"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "x-stapel-errors": [
+              "error.400.calendar_invalid_range",
+              "error.400.calendar_invalid_recurrence"
+            ]
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StapelError"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-stapel-errors": [
+              "error.403.calendar_not_event_owner"
+            ]
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StapelError"
+                }
+              }
+            },
+            "description": "Not Found",
+            "x-stapel-errors": [
+              "error.404.calendar_event_not_found"
+            ]
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StapelError"
+                }
+              }
+            },
+            "description": "Service Unavailable",
+            "x-stapel-errors": [
+              "error.503.mandate_unavailable"
+            ]
+          }
+        }
+      },
+      "delete": {
+        "operationId": "calendar_api_v1_events_destroy",
+        "description": "Retrieve/update/delete a single event (mutations owner-only).\n\n**Permissions:** `HasWorkspaceMandateIfScoped`",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true
+          }
+        ],
+        "tags": [
+          "Calendar"
+        ],
+        "security": [
+          {
+            "JWTCookieAuth": []
+          },
+          {
+            "JWTBearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventDeleteResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StapelError"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-stapel-errors": [
+              "error.403.calendar_not_event_owner"
+            ]
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StapelError"
+                }
+              }
+            },
+            "description": "Not Found",
+            "x-stapel-errors": [
+              "error.404.calendar_event_not_found"
+            ]
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StapelError"
+                }
+              }
+            },
+            "description": "Service Unavailable",
+            "x-stapel-errors": [
+              "error.503.mandate_unavailable"
+            ]
+          }
+        }
+      }
+    },
+    "/calendar/api/v1/events/{event_id}/ics": {
+      "get": {
+        "operationId": "calendar_api_v1_events_ics_retrieve",
+        "description": "The event as an RFC 5545 calendar file (attachment).\n\n**Permissions:** `HasWorkspaceMandateIfScoped`",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true
+          }
+        ],
+        "tags": [
+          "Calendar"
+        ],
+        "security": [
+          {
+            "JWTCookieAuth": []
+          },
+          {
+            "JWTBearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/calendar": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": ""
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StapelError"
+                }
+              }
+            },
+            "description": "Not Found",
+            "x-stapel-errors": [
+              "error.404.calendar_event_not_found"
+            ]
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StapelError"
+                }
+              }
+            },
+            "description": "Service Unavailable",
+            "x-stapel-errors": [
+              "error.503.mandate_unavailable"
+            ]
+          }
+        }
+      }
+    },
+    "/calendar/api/v1/events/{event_id}/participants": {
+      "put": {
+        "operationId": "calendar_api_v1_events_participants_update",
+        "description": "Replace an event's participant set (replace-set semantics, owner-only).\n\n**Permissions:** `IsNotAnonymousUser`",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true
+          }
+        ],
+        "tags": [
+          "Calendar"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParticipantsReplaceRequest"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/ParticipantsReplaceRequest"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/ParticipantsReplaceRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWTCookieAuth": []
+          },
+          {
+            "JWTBearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StapelError"
+                }
+              }
+            },
+            "description": "Forbidden",
+            "x-stapel-errors": [
+              "error.403.calendar_not_event_owner"
+            ]
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StapelError"
+                }
+              }
+            },
+            "description": "Not Found",
+            "x-stapel-errors": [
+              "error.404.calendar_event_not_found"
+            ]
+          }
+        }
+      }
+    },
+    "/calendar/api/v1/events/{event_id}/respond": {
+      "post": {
+        "operationId": "calendar_api_v1_events_respond_create",
+        "description": "Record the requesting user's RSVP to an event.\n\n**Permissions:** `IsNotAnonymousUser`",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "event_id",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "required": true
+          }
+        ],
+        "tags": [
+          "Calendar"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RSVPRequest"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/RSVPRequest"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/RSVPRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "security": [
+          {
+            "JWTCookieAuth": []
+          },
+          {
+            "JWTBearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventResponse"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StapelError"
+                }
+              }
+            },
+            "description": "Bad Request",
+            "x-stapel-errors": [
+              "error.400.calendar_invalid_rsvp"
+            ]
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StapelError"
+                }
+              }
+            },
+            "description": "Not Found",
+            "x-stapel-errors": [
+              "error.404.calendar_not_invited"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AvailabilityResponse": {
+        "type": "object",
+        "description": "Free/busy + open slots for a user.",
+        "properties": {
+          "busy": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IntervalResponse"
+            },
+            "description": "Coalesced busy intervals in the range"
+          },
+          "slots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IntervalResponse"
+            },
+            "description": "Open booking slots (empty if no availability windows set)"
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "True when a series expansion hit MAX_EXPANSION_OCCURRENCES inside the range, so later times in this answer only LOOK free — show the reader that the answer is incomplete rather than presenting it as availability"
+          }
+        }
+      },
+      "CalendarResponse": {
+        "type": "object",
+        "description": "A user's calendar over a range: concrete events + expanded occurrences.",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventResponse"
+            },
+            "description": "Concrete/standalone events overlapping the range"
+          },
+          "occurrences": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OccurrenceResponse"
+            },
+            "description": "Expanded (virtual + materialized) occurrences of series"
+          }
+        }
+      },
+      "EventCreateRequest": {
+        "type": "object",
+        "description": "Create an event.",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Event title"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Start (tz-aware ISO 8601)"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "description": "End (tz-aware ISO 8601)"
+          },
+          "description": {
+            "type": "string",
+            "description": "Optional description"
+          },
+          "recurrence_type": {
+            "type": "string",
+            "description": "none/daily/weekdays/weekly/biweekly/monthly/custom"
+          },
+          "recurrence_interval": {
+            "type": "integer",
+            "nullable": true,
+            "description": "RRULE INTERVAL (>=1)"
+          },
+          "recurrence_weekdays": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "Weekday ints (0=Mon..6=Sun) for custom"
+          },
+          "recurrence_until": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Series end (tz-aware ISO 8601), maps to RRULE UNTIL"
+          },
+          "recurrence_count": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Number of occurrences, maps to RRULE COUNT"
+          },
+          "participant_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "User ids to invite"
+          }
+        },
+        "required": [
+          "end",
+          "start",
+          "title"
+        ]
+      },
+      "EventDeleteResponse": {
+        "type": "object",
+        "description": "The outcome of `DELETE /events/{event_id}`.\n\nNot an `EventResponse`: a delete answers what it did, and for a\nmaterialized occurrence what it did is not a deletion. The body is one\nword because that word is the whole information — but it IS information,\nwhich is why the endpoint does not answer 204.",
+        "properties": {
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/StatusEnum"
+              }
+            ],
+            "description": "What the delete did — `deleted` (the row is gone) or `cancelled` (a materialized occurrence was tombstoned and still reads back)\n\n* `deleted` - The row is gone\n* `cancelled` - A materialized occurrence was tombstoned, not removed — it still reads back, with `status: cancelled`, so the recurrence rule cannot resurrect it at that instant"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "EventResponse": {
+        "type": "object",
+        "description": "A calendar event (series master or concrete occurrence).",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Event id (UUID)"
+          },
+          "title": {
+            "type": "string",
+            "description": "Event title"
+          },
+          "description": {
+            "type": "string",
+            "description": "Free-text description"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Start (tz-aware ISO 8601)"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "description": "End (tz-aware ISO 8601)"
+          },
+          "owner_id": {
+            "type": "string",
+            "description": "Creator's user id"
+          },
+          "scope_key": {
+            "type": "string",
+            "description": "Opaque host scope (workspace/org/tenant)"
+          },
+          "status": {
+            "type": "string",
+            "description": "confirmed/tentative/cancelled"
+          },
+          "recurrence_type": {
+            "type": "string",
+            "description": "Human preset used to build the RRULE"
+          },
+          "rrule": {
+            "type": "string",
+            "description": "Canonical RFC 5545 RRULE line (empty for non-recurring)"
+          },
+          "recurrence_parent_id": {
+            "type": "string",
+            "nullable": true,
+            "description": "Series master id if this is a materialized occurrence"
+          },
+          "participants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParticipantResponse"
+            },
+            "description": "Invitees with RSVPs"
+          }
+        },
+        "required": [
+          "description",
+          "end",
+          "id",
+          "owner_id",
+          "recurrence_type",
+          "rrule",
+          "scope_key",
+          "start",
+          "status",
+          "title"
+        ]
+      },
+      "IntervalResponse": {
+        "type": "object",
+        "description": "A time interval.",
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Interval start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Interval end"
+          }
+        },
+        "required": [
+          "end",
+          "start"
+        ]
+      },
+      "OccurrenceResponse": {
+        "type": "object",
+        "description": "A single (possibly virtual) instance of a recurring event.",
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "description": "The series master id"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Occurrence start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Occurrence end"
+          },
+          "is_materialized": {
+            "type": "boolean",
+            "description": "True if a concrete row exists for this instant"
+          },
+          "materialized_id": {
+            "type": "string",
+            "nullable": true,
+            "description": "The concrete occurrence id, if materialized"
+          }
+        },
+        "required": [
+          "end",
+          "event_id",
+          "is_materialized",
+          "start"
+        ]
+      },
+      "ParticipantResponse": {
+        "type": "object",
+        "description": "An invitee and their RSVP.",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "description": "The participant's user id"
+          },
+          "rsvp": {
+            "type": "string",
+            "description": "One of invited/accepted/tentative/declined"
+          }
+        },
+        "required": [
+          "rsvp",
+          "user_id"
+        ]
+      },
+      "ParticipantsReplaceRequest": {
+        "type": "object",
+        "description": "Replace an event's participant set (PUT).",
+        "properties": {
+          "participant_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The complete desired invitee list. The owner is always"
+          }
+        }
+      },
+      "PatchedEventUpdateRequest": {
+        "type": "object",
+        "description": "Partially update an event (PATCH). Every field is optional — only the\nfields present in the request body are changed.\n\nEditing any recurrence field (or ``start``, the series anchor) of a series\nmaster re-specifies and rebuilds the whole rule — send the COMPLETE\nrecurrence spec, exactly as for create (the library stores only the\ncanonical RRULE, not its constituent inputs, so recurrence params cannot be\nmerged individually).",
+        "properties": {
+          "title": {
+            "type": "string",
+            "nullable": true,
+            "description": "New title"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true,
+            "description": "New description"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "New start (tz-aware ISO 8601)"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "New end (tz-aware ISO 8601)"
+          },
+          "status": {
+            "type": "string",
+            "nullable": true,
+            "description": "confirmed/tentative/cancelled"
+          },
+          "recurrence_type": {
+            "type": "string",
+            "nullable": true,
+            "description": "none/daily/weekdays/weekly/biweekly/monthly/custom"
+          },
+          "recurrence_interval": {
+            "type": "integer",
+            "nullable": true,
+            "description": "RRULE INTERVAL (>=1)"
+          },
+          "recurrence_weekdays": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "description": "Weekday ints (0=Mon..6=Sun) for custom"
+          },
+          "recurrence_until": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Series end (tz-aware ISO 8601), maps to RRULE UNTIL"
+          },
+          "recurrence_count": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Number of occurrences, maps to RRULE COUNT"
+          }
+        }
+      },
+      "RSVPRequest": {
+        "type": "object",
+        "description": "Respond to an event invitation.",
+        "properties": {
+          "rsvp": {
+            "type": "string",
+            "description": "One of accepted/tentative/declined"
+          }
+        },
+        "required": [
+          "rsvp"
+        ]
+      },
+      "StapelError": {
+        "type": "object",
+        "description": "Structured error returned by all Stapel API endpoints.",
+        "properties": {
+          "localizable_error": {
+            "type": "string",
+            "description": "Translation key for client-side localization",
+            "example": "error.404.not_found"
+          },
+          "error": {
+            "type": "string",
+            "description": "Human-readable fallback/debug message — not reliably English,"
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": {},
+            "description": "Context values for template placeholders",
+            "example": {
+              "retry_after": 30
+            }
+          },
+          "error_language": {
+            "type": "string",
+            "description": "The language `error` is written in (e.g. 'en', 'ru'),"
+          }
+        },
+        "required": [
+          "error",
+          "localizable_error"
+        ]
+      },
+      "StatusEnum": {
+        "enum": [
+          "deleted",
+          "cancelled"
+        ],
+        "type": "string",
+        "description": "* `deleted` - The row is gone\n* `cancelled` - A materialized occurrence was tombstoned, not removed — it still reads back, with `status: cancelled`, so the recurrence rule cannot resurrect it at that instant"
+      }
+    },
+    "securitySchemes": {
+      "JWTBearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT access token in the `Authorization: Bearer <token>` header — the credential a native client sends. When the JWT cookie is also present, the cookie wins."
+      },
+      "JWTCookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "stapel_jwt",
+        "description": "JWT token stored in cookie. Login via /auth/admin/ to get the cookie."
+      }
+    }
+  }
+}
